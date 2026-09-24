@@ -37,6 +37,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -70,6 +72,9 @@ class DownloadManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeJobs = ConcurrentHashMap<String, Job>()
 
+    // Señal interna para procesar la cola por eventos (con respaldo periódico de 1s).
+    private val queueSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     private val activeFlow: StateFlow<Boolean> =
         chapterDao.observeByStatuses(ACTIVE_STATUSES)
             .map { it.isNotEmpty() }
@@ -82,6 +87,7 @@ class DownloadManager @Inject constructor(
         scope.launch {
             // Auto-reanudación: si la app se cerró con capítulos "descargando", se vuelven a encolar.
             chapterDao.updateStatuses(listOf(QueueStatus.DOWNLOADING.name), QueueStatus.QUEUED.name)
+            kickQueue()
         }
         scope.launch {
             activeFlow.collect { active ->
@@ -106,6 +112,7 @@ class DownloadManager @Inject constructor(
                 }
             }
             Log.d(TAG, "enqueue: ${chapterIds.size} pedidos, $queued encolados")
+            if (queued > 0) kickQueue()
         }
     }
 
@@ -123,6 +130,7 @@ class DownloadManager @Inject constructor(
                 listOf(QueueStatus.PAUSED.name, QueueStatus.FAILED.name),
                 QueueStatus.QUEUED.name,
             )
+            kickQueue()
         }
     }
 
@@ -130,6 +138,7 @@ class DownloadManager @Inject constructor(
         scope.launch {
             chapterDao.updateStatus(chapterId, QueueStatus.CANCELLED.name)
             activeJobs.remove(chapterId)?.cancel()
+            kickQueue()
         }
     }
 
@@ -138,6 +147,7 @@ class DownloadManager @Inject constructor(
             chapterDao.updateStatuses(QUEUE_STATUSES, QueueStatus.CANCELLED.name)
             activeJobs.values.forEach { it.cancel() }
             activeJobs.clear()
+            kickQueue()
         }
     }
 
@@ -189,17 +199,26 @@ class DownloadManager @Inject constructor(
 
     private suspend fun processLoop() {
         while (scope.coroutineContext.isActive) {
-            val chapterLimit = settingsRepository.defaultChapterConcurrency.first()
-            val activeCount = activeJobs.size
-            val capacity = (chapterLimit - activeCount).coerceAtLeast(0)
-            if (capacity > 0) {
-                val queued = chapterDao.getByStatuses(listOf(QueueStatus.QUEUED.name))
-                    .filter { !activeJobs.containsKey(it.id) }
-                    .take(capacity)
-                queued.forEach { launchChapterJob(it.id) }
-            }
-            delay(400)
+            runQueueTick()
+            // Espera por eventos; el 1s es solo un respaldo por si se perdió alguna señal.
+            withTimeoutOrNull(QUEUE_POLL_FALLBACK_MS) { queueSignal.first() }
         }
+    }
+
+    private suspend fun runQueueTick() {
+        val chapterLimit = settingsRepository.defaultChapterConcurrency.first()
+        val activeCount = activeJobs.size
+        val capacity = (chapterLimit - activeCount).coerceAtLeast(0)
+        if (capacity > 0) {
+            val queued = chapterDao.getByStatuses(listOf(QueueStatus.QUEUED.name))
+                .filter { !activeJobs.containsKey(it.id) }
+                .take(capacity)
+            queued.forEach { launchChapterJob(it.id) }
+        }
+    }
+
+    private fun kickQueue() {
+        queueSignal.tryEmit(Unit)
     }
 
     private fun launchChapterJob(chapterId: String) {
@@ -208,6 +227,7 @@ class DownloadManager @Inject constructor(
                 processChapter(chapterId)
             } finally {
                 activeJobs.remove(chapterId)
+                kickQueue()
             }
         }
         activeJobs[chapterId] = job
@@ -340,6 +360,7 @@ class DownloadManager @Inject constructor(
 
         const val MAX_ATTEMPTS = 4
         const val BASE_RETRY_MS = 2_000L
+        const val QUEUE_POLL_FALLBACK_MS = 1_000L
 
         val ACTIVE_STATUSES = listOf(
             QueueStatus.QUEUED.name,

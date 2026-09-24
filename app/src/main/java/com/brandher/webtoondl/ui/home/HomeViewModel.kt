@@ -68,13 +68,27 @@ class HomeViewModel @Inject constructor(
 
     fun refreshHome() {
         viewModelScope.launch {
-            _discovery.value = DiscoveryUiState.Loading
+            // Muestra al instante lo ya obtenido (funciona sin red) y refresca en segundo plano.
+            if (lastHomeSections.isNotEmpty()) {
+                _discovery.value = DiscoveryUiState.Home(lastHomeSections)
+            } else {
+                _discovery.value = DiscoveryUiState.Loading
+            }
             _discovery.value = try {
                 val sections = seriesRepository.discoverHome()
                 lastHomeSections = sections
-                DiscoveryUiState.Home(sections)
+                if (sections.isNotEmpty()) {
+                    DiscoveryUiState.Home(sections)
+                } else {
+                    DiscoveryUiState.Error("No se pudieron cargar las recomendaciones")
+                }
             } catch (e: Exception) {
-                DiscoveryUiState.Error(e.message ?: "No se pudieron cargar las recomendaciones")
+                // Sin red o error: conserva lo cacheado; si no hay nada, se muestra el error.
+                if (lastHomeSections.isEmpty()) {
+                    DiscoveryUiState.Error(e.message ?: "No se pudieron cargar las recomendaciones")
+                } else {
+                    _discovery.value
+                }
             }
         }
     }

@@ -29,7 +29,7 @@ object Packager {
         val document = PdfDocument()
         try {
             files.sortedBy { it.name }.forEachIndexed { index, file ->
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return@forEachIndexed
+                val bitmap = decodeSampled(file) ?: return@forEachIndexed
                 try {
                     val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
                     val page = document.startPage(pageInfo)
@@ -44,4 +44,25 @@ object Packager {
             document.close()
         }
     }
+
+    /**
+     * Decodifica la imagen aplicando sampling cuando es demasiado grande, para evitar OOM
+     * al abrir páginas webtoon muy altas. Mide primero dimensiones (inJustDecodeBounds).
+     */
+    private fun decodeSampled(file: File, maxLongSide: Int = MAX_PDF_SIDE): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sample = 1
+        while (bounds.outHeight / sample > maxLongSide || bounds.outWidth / sample > maxLongSide) {
+            sample *= 2
+        }
+        return BitmapFactory.decodeFile(
+            file.absolutePath,
+            BitmapFactory.Options().apply { inSampleSize = sample },
+        )
+    }
+
+    private const val MAX_PDF_SIDE = 4096
 }

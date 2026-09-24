@@ -56,8 +56,20 @@ class LibraryExporter @Inject constructor(
                         OutputFormat.IMAGES -> {
                             val chapterFolder = dir(resolver, seriesFolder, "Chapter ${pad(chapter.number)}")
                                 ?: continue
+                            // Caché de children por carpeta: evita consultar el provider por cada archivo.
+                            var childrenCache = children(resolver, chapterFolder)
                             files.forEach { file ->
-                                copyFile(resolver, chapterFolder, file.name, file)
+                                var doc = childrenCache[file.name]
+                                if (doc == null) {
+                                    doc = DocumentsContract.createDocument(
+                                        resolver,
+                                        chapterFolder,
+                                        "application/octet-stream",
+                                        file.name,
+                                    )
+                                    if (doc != null) childrenCache = childrenCache + (file.name to doc)
+                                }
+                                doc?.let { copyFromFile(resolver, it, file) }
                                 exported++
                             }
                         }
@@ -89,6 +101,10 @@ class LibraryExporter @Inject constructor(
 
     private fun copyFile(resolver: ContentResolver, parentDoc: Uri, name: String, file: File) {
         val doc = fileDoc(resolver, parentDoc, name) ?: return
+        copyFromFile(resolver, doc, file)
+    }
+
+    private fun copyFromFile(resolver: ContentResolver, doc: Uri, file: File) {
         resolver.openOutputStream(doc)?.use { out ->
             file.inputStream().use { input -> input.copyTo(out) }
         }

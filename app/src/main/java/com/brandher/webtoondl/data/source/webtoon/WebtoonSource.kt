@@ -103,7 +103,10 @@ class WebtoonSource @Inject constructor(
         // Consume la API de episodios; si devuelve lista vacía (límite temporal), reintenta con backoff.
         val response = fetchEpisodesWithRetry(apiUrl)
 
-        return response.result.episodeList.mapIndexed { index, episode ->
+        return response.result.episodeList
+            // Orden determinista ascendente aunque la API lo devuelva en otro orden.
+            .sortedBy { it.episodeNo }
+            .mapIndexed { index, episode ->
             Chapter(
                 id = "${series.id}:${episode.episodeNo}",
                 seriesId = series.id,

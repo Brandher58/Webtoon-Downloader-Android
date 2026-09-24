@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -73,6 +74,19 @@ class SeriesViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = SeriesUiState.Loading,
         )
+
+    private var autoRetried = false
+
+    init {
+        // Auto-reparación: si la serie quedó sin capítulos (fallo transitorio anterior), reintenta una vez al abrir.
+        viewModelScope.launch {
+            val state = uiState.first { it is SeriesUiState.Loaded }
+            if (state is SeriesUiState.Loaded && state.items.isEmpty() && !autoRetried) {
+                autoRetried = true
+                retryChapters()
+            }
+        }
+    }
 
     fun consumeNotice() {
         _notice.value = null

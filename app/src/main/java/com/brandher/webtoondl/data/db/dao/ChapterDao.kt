@@ -12,28 +12,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ChapterDao {
 
-    @Upsert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(chapters: List<ChapterEntity>)
-
-    /** Inserta solo capítulos nuevos; los que ya existen no se tocan (conserva estado descargado y páginas). */
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertNewChapters(chapters: List<ChapterEntity>)
-
-    /** Actualiza solo metadatos (título/número/fecha), sin tocar status_descarga ni páginas. */
-    @Query(
-        """UPDATE chapters SET
-           title = :title, number = :number, viewer_url = :viewerUrl,
-           thumb_url = :thumbUrl, date = :date
-           WHERE id = :id""",
-    )
-    suspend fun updateMetadata(
-        id: String,
-        title: String,
-        number: Int,
-        viewerUrl: String,
-        thumbUrl: String?,
-        date: Long?,
-    )
 
     @Update
     suspend fun update(chapter: ChapterEntity)

@@ -92,8 +92,6 @@ class SeriesRepositoryImpl @Inject constructor(
     override suspend fun getSeries(seriesId: String): Series? =
         seriesDao.getById(seriesId)?.toDomain()
 
-    /** Vuelve a buscar los capítulos de la serie desde la fuente. Inserta nuevos y actualiza metadatos
-     *  sin tocar el estado de descarga ni las páginas ya existentes. Devuelve el número de capítulos. */
     override suspend fun syncChapters(seriesId: String): Int {
         val series = seriesDao.getById(seriesId)?.toDomain() ?: return 0
         val source = sourceRegistry.match(series.url)
@@ -117,13 +115,25 @@ class SeriesRepositoryImpl @Inject constructor(
         return series.id
     }
 
-    /** Solo inserta capítulos nuevos y refresca metadatos; nunca sobrescribe estados de descarga. */
+    /** Inserta/actualiza capítulos conservando el estado de descarga de los ya existentes. */
     private suspend fun persistChapters(chapters: List<ChapterEntity>) {
         if (chapters.isEmpty()) return
-        chapterDao.insertNewChapters(chapters)
-        chapters.forEach { c ->
-            chapterDao.updateMetadata(c.id, c.title, c.number, c.viewerUrl, c.thumbUrl, c.date)
+        val existing = chapterDao.getByIds(chapters.map { it.id }).associateBy { it.id }
+        val merged = chapters.map { fresh ->
+            val old = existing[fresh.id]
+            if (old == null) {
+                fresh
+            } else {
+                fresh.copy(
+                    queueStatus = old.queueStatus,
+                    pagesTotal = old.pagesTotal,
+                    pagesDone = old.pagesDone,
+                    outputFormat = old.outputFormat,
+                    error = old.error,
+                )
+            }
         }
+        chapterDao.upsertAll(merged)
     }
 
     override suspend fun deleteSeries(seriesId: String) {

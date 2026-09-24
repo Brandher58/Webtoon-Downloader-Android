@@ -5,7 +5,9 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
+import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.SeriesEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,6 +23,28 @@ interface SeriesDao {
 
     @Upsert
     suspend fun upsert(series: SeriesEntity)
+
+    /** Escribe serie + capítulos + limpieza de forma atómica (evita series "fantasma" si se cancela a medias). */
+    @Transaction
+    suspend fun syncSeries(
+        series: SeriesEntity,
+        chapters: List<ChapterEntity>,
+        staleIds: List<String>,
+    ) {
+        upsert(series)
+        if (chapters.isNotEmpty()) {
+            for (chapter in chapters) upsertChapter(chapter)
+        }
+        if (staleIds.isNotEmpty()) {
+            for (id in staleIds) deleteChapterById(id)
+        }
+    }
+
+    @Upsert
+    suspend fun upsertChapter(chapter: ChapterEntity)
+
+    @Query("DELETE FROM chapters WHERE id = :chapterId")
+    suspend fun deleteChapterById(chapterId: String)
 
     @Query("SELECT * FROM series WHERE id = :id")
     suspend fun getById(id: String): SeriesEntity?

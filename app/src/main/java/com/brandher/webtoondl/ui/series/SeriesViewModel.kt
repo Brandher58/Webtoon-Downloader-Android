@@ -1,6 +1,7 @@
 package com.brandher.webtoondl.ui.series
 
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -157,7 +158,13 @@ class SeriesViewModel @Inject constructor(
         downloadRepository.deleteSeries(seriesId)
     }
 
+    private var lastEnqueueMs = 0L
+
     private fun enqueueWithLog(what: String, ids: List<String>) {
+        // Ignora dobles toques rápidos en los botones de descarga.
+        val now = SystemClock.uptimeMillis()
+        if (now - lastEnqueueMs < 700) return
+        lastEnqueueMs = now
         Log.d(TAG, "encolando $what: ${ids.size} capítulos")
         downloadRepository.enqueue(ids)
     }

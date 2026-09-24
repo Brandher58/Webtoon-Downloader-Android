@@ -97,13 +97,14 @@ class HomeViewModel @Inject constructor(
     }
 
     fun addUrl(rawUrl: String) {
+        if (addUrlState.value is AddUrlState.Loading) return
         val url = rawUrl.trim()
         if (url.isEmpty()) {
             _addUrlState.value = AddUrlState.Error("Pega una URL")
             return
         }
+        _addUrlState.value = AddUrlState.Loading
         viewModelScope.launch {
-            _addUrlState.value = AddUrlState.Loading
             _addUrlState.value = try {
                 AddUrlState.Success(seriesRepository.addByUrl(url))
             } catch (e: Exception) {

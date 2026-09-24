@@ -8,6 +8,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -38,24 +41,47 @@ fun WebtoonDLApp() {
     val entries by navController.currentBackStackEntryAsState()
     val currentRoute = entries?.destination?.route
 
+    // Se incrementa cada vez que el usuario pulsa la pestaña Inicio para volver arriba.
+    var homeScrollRequest by remember { mutableIntStateOf(0) }
+
+    // La barra inferior solo se muestra en las pestañas principales.
+    val showBottomBar = Destination.entries.any { it.route == currentRoute }
+
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                Destination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (showBottomBar) {
+                NavigationBar {
+                    Destination.entries.forEach { destination ->
+                        val selectedTab = currentRoute == destination.route
+                        NavigationBarItem(
+                            selected = selectedTab,
+                            onClick = {
+                                if (selectedTab) {
+                                    // Ya está en la pestaña: Inicio sube al tope.
+                                    if (destination == Destination.Home) homeScrollRequest++
+                                    return@NavigationBarItem
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(destination.icon, contentDescription = destination.label) },
-                        label = { Text(destination.label) },
-                    )
+                                if (destination == Destination.Home) {
+                                    // Sale de las pantallas empujadas (ficha/lector) y vuelve al Home.
+                                    navController.popBackStack(
+                                        navController.graph.findStartDestination().id,
+                                        false,
+                                    )
+                                    homeScrollRequest++
+                                } else {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            },
+                            icon = { Icon(destination.icon, contentDescription = destination.label) },
+                            label = { Text(destination.label) },
+                        )
+                    }
                 }
             }
         },
@@ -66,7 +92,10 @@ fun WebtoonDLApp() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(Destination.Home.route) {
-                HomeScreen(onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) })
+                HomeScreen(
+                    onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) },
+                    scrollRequest = homeScrollRequest,
+                )
             }
             composable(Destination.Library.route) {
                 LibraryScreen(
@@ -93,7 +122,12 @@ fun WebtoonDLApp() {
             ) {
                 ReaderScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenChapter = { chapterId -> navController.navigate(Routes.reader(chapterId)) },
+                    onOpenChapter = { chapterId ->
+                        // Reemplaza la entrada del lector para que Atrás no recorra todos los capítulos.
+                        navController.navigate(Routes.reader(chapterId)) {
+                            popUpTo(Routes.READER) { inclusive = true }
+                        }
+                    },
                 )
             }
         }

@@ -37,7 +37,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -54,13 +56,14 @@ import com.brandher.webtoondl.domain.model.SeriesRef
 fun HomeScreen(
     onOpenSeries: (String) -> Unit,
     modifier: Modifier = Modifier,
+    scrollRequest: Int = 0,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val discovery by viewModel.discovery.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val addUrlState by viewModel.addUrlState.collectAsStateWithLifecycle()
-    var url by remember { mutableStateOf("") }
-    var searchQuery by remember { mutableStateOf("") }
+    var url by rememberSaveable { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(addUrlState) {
         if (addUrlState is AddUrlState.Success) {
@@ -95,7 +98,12 @@ fun HomeScreen(
 
                 if (d.items.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Sin resultados para \"${d.query}\"")
+                        Text(
+                            if (d.query.trim().startsWith("http"))
+                                "La búsqueda no encuentra URLs. Usa la tarjeta \"Agregar por URL\" para importar una serie directamente."
+                            else
+                                "Sin resultados para \"${d.query}\"",
+                        )
                     }
                 } else {
                     LazyVerticalGrid(
@@ -138,7 +146,14 @@ fun HomeScreen(
         }
 
         is DiscoveryUiState.Home -> {
+            val homeListState = rememberLazyListState()
+            LaunchedEffect(scrollRequest) {
+                if (scrollRequest > 0 && homeListState.firstVisibleItemIndex > 0) {
+                    homeListState.animateScrollToItem(0)
+                }
+            }
             LazyColumn(
+                state = homeListState,
                 modifier = modifier
                     .fillMaxSize()
                     .padding(bottom = 8.dp),

@@ -3,10 +3,10 @@ package com.brandher.webtoondl.ui.library
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.brandher.webtoondl.data.export.LibraryExporter
 import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.DownloadRepository
+import com.brandher.webtoondl.domain.repo.ExportRepository
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -34,7 +34,7 @@ data class LibraryUiState(
 class LibraryViewModel @Inject constructor(
     seriesRepository: SeriesRepository,
     private val downloadRepository: DownloadRepository,
-    private val exporter: LibraryExporter,
+    private val exportRepository: ExportRepository,
 ) : ViewModel() {
 
     private val _exporting = MutableStateFlow<String?>(null)
@@ -70,7 +70,7 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             _exporting.value = seriesId
             _message.value = try {
-                exporter.exportSeries(seriesId, format, treeUri)
+                exportRepository.exportSeries(seriesId, format, treeUri)
             } catch (e: Exception) {
                 e.message ?: "No se pudo exportar"
             }

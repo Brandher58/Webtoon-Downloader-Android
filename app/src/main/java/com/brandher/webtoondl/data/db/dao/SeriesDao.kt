@@ -5,9 +5,6 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
-import androidx.room.Upsert
-import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.SeriesEntity
 import kotlinx.coroutines.flow.Flow
 

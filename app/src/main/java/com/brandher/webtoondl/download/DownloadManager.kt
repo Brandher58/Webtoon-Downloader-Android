@@ -55,7 +55,7 @@ import okhttp3.Request
 
 /**
  * Motor de descargas: procesa la cola persistida en Room con concurrencia acotada,
- * reintentos con backoff, descargas reanudables y empaquetado CBZ/PDF opcional.
+ * reintentos con backoff y descargas reanudables.
  */
 @Singleton
 class DownloadManager @Inject constructor(

@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import androidx.room.Upsert
 import com.brandher.webtoondl.data.db.ChapterEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -51,9 +50,6 @@ interface ChapterDao {
     @Query("SELECT * FROM chapters WHERE queue_status IN (:statuses)")
     suspend fun getByStatuses(statuses: List<String>): List<ChapterEntity>
 
-    @Query("DELETE FROM chapters WHERE series_id = :seriesId")
-    suspend fun deleteForSeries(seriesId: String)
-
     @Query("SELECT * FROM chapters WHERE series_id = :seriesId ORDER BY number ASC")
     fun observeForSeries(seriesId: String): Flow<List<ChapterEntity>>
 
@@ -73,14 +69,6 @@ interface ChapterDao {
            ORDER BY c.number ASC""",
     )
     fun observeByStatuses(statuses: List<String>): Flow<List<ChapterEntity>>
-
-    @Query(
-        """SELECT c.* FROM chapters c
-           JOIN series s ON s.id = c.series_id
-           WHERE s.id = :seriesId AND queue_status IN (:statuses)
-           ORDER BY c.number ASC""",
-    )
-    fun observeBySeriesAndStatuses(seriesId: String, statuses: List<String>): Flow<List<ChapterEntity>>
 
     @Query(
         """SELECT c.*, s.title AS seriesTitle

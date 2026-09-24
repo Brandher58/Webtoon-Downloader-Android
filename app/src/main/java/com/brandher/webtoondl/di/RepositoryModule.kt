@@ -1,7 +1,9 @@
 package com.brandher.webtoondl.di
 
+import com.brandher.webtoondl.data.export.ExportRepositoryImpl
 import com.brandher.webtoondl.data.repository.SeriesRepositoryImpl
 import com.brandher.webtoondl.domain.repo.DownloadRepository
+import com.brandher.webtoondl.domain.repo.ExportRepository
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import com.brandher.webtoondl.download.DownloadManager
 import dagger.Binds
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDownloadRepository(impl: DownloadManager): DownloadRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExportRepository(impl: ExportRepositoryImpl): ExportRepository
 }

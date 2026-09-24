@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material3.AlertDialog
@@ -65,6 +66,7 @@ fun SeriesScreen(
     viewModel: SeriesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDeleteSeriesDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -79,6 +81,11 @@ fun SeriesScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showDeleteSeriesDialog = true }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Eliminar serie")
                     }
                 },
             )
@@ -133,12 +140,34 @@ fun SeriesScreen(
                                 selected = item.chapter.id in loaded.selected,
                                 onToggle = { viewModel.toggleChapter(item.chapter.id) },
                                 onOpenReader = { onOpenReader(item.chapter.id) },
+                                onDeleteChapter = { viewModel.deleteChapter(item.chapter.id) },
                             )
                         }
                     }
                 }
             }
         }
+    }
+if (showDeleteSeriesDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteSeriesDialog = false },
+            title = { Text("Eliminar serie") },
+            text = { Text("Se borrarán del dispositivo la serie y sus capítulos descargados. ¿Continuar?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteSeriesDialog = false
+                    viewModel.deleteSeries()
+                    onBack()
+                }) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSeriesDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 
@@ -374,6 +403,7 @@ private fun ChapterRow(
     selected: Boolean,
     onToggle: () -> Unit,
     onOpenReader: () -> Unit,
+    onDeleteChapter: () -> Unit,
 ) {
     Card(
         onClick = onToggle,
@@ -420,6 +450,9 @@ private fun ChapterRow(
             if (item.status == QueueStatus.COMPLETED) {
                 TextButton(onClick = onOpenReader) {
                     Text("Leer")
+                }
+                IconButton(onClick = onDeleteChapter) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Eliminar capítulo")
                 }
             }
         }

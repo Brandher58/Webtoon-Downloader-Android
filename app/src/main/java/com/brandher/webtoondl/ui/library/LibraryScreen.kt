@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -62,6 +63,7 @@ fun LibraryScreen(
     var pendingExport by remember { mutableStateOf<String?>(null) }
     var pendingFormat by remember { mutableStateOf<OutputFormat?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var seriesToDelete by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -127,6 +129,7 @@ fun LibraryScreen(
                         pendingExport = item.stats.series.id
                         showExportDialog = true
                     },
+                    onDelete = { seriesToDelete = item.stats.series.id },
                 )
             }
         }
@@ -194,6 +197,27 @@ fun LibraryScreen(
             },
         )
     }
+
+    seriesToDelete?.let { seriesId ->
+        AlertDialog(
+            onDismissRequest = { seriesToDelete = null },
+            title = { Text("Eliminar serie") },
+            text = { Text("Se borrarán del dispositivo la serie y sus capítulos descargados. ¿Continuar?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    seriesToDelete = null
+                    viewModel.deleteSeries(seriesId)
+                }) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { seriesToDelete = null }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -203,9 +227,10 @@ private fun LibraryRow(
     onOpen: () -> Unit,
     onContinue: (() -> Unit)?,
     onExport: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val stats: SeriesStats = item.stats
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -278,6 +303,9 @@ private fun LibraryRow(
                 }
                 IconButton(onClick = onExport, enabled = !exporting) {
                     Icon(Icons.Filled.Share, contentDescription = "Exportar")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Eliminar serie")
                 }
             }
         }

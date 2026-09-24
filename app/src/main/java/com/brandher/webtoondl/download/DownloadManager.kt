@@ -152,6 +152,26 @@ class DownloadManager @Inject constructor(
         }
     }
 
+    override fun deleteChapter(chapterId: String) {
+        scope.launch {
+            activeJobs.remove(chapterId)?.cancel()
+            val entity = chapterDao.getById(chapterId) ?: return@launch
+            storage.deleteChapter(entity)
+            pageDao.deleteForChapter(chapterId)
+            chapterDao.resetDownload(chapterId, QueueStatus.NONE.name)
+        }
+    }
+
+    override fun deleteSeries(seriesId: String) {
+        scope.launch {
+            chapterDao.getForSeries(seriesId).forEach { chapter ->
+                activeJobs.remove(chapter.id)?.cancel()
+            }
+            storage.deleteSeries(seriesId)
+            seriesDao.deleteById(seriesId)
+        }
+    }
+
     override fun observeQueue(): Flow<List<QueueItem>> =
         chapterDao.observeQueue(QUEUE_STATUSES).map { rows ->
             rows.map { row ->

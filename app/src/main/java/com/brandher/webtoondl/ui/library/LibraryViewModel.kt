@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.brandher.webtoondl.data.export.LibraryExporter
 import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.SeriesStats
+import com.brandher.webtoondl.domain.repo.DownloadRepository
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -32,6 +33,7 @@ data class LibraryUiState(
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     seriesRepository: SeriesRepository,
+    private val downloadRepository: DownloadRepository,
     private val exporter: LibraryExporter,
 ) : ViewModel() {
 
@@ -78,5 +80,9 @@ class LibraryViewModel @Inject constructor(
 
     fun consumeMessage() {
         _message.value = null
+    }
+
+    fun deleteSeries(seriesId: String) {
+        downloadRepository.deleteSeries(seriesId)
     }
 }

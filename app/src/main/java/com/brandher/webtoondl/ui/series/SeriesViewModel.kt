@@ -151,6 +151,12 @@ class SeriesViewModel @Inject constructor(
 
     fun resumeAll() = downloadRepository.resumeAll()
 
+    fun deleteChapter(chapterId: String) = downloadRepository.deleteChapter(chapterId)
+
+    fun deleteSeries() {
+        downloadRepository.deleteSeries(seriesId)
+    }
+
     private fun enqueueWithLog(what: String, ids: List<String>) {
         Log.d(TAG, "encolando $what: ${ids.size} capítulos")
         downloadRepository.enqueue(ids)

@@ -21,6 +21,12 @@ interface DownloadRepository {
     /** Cancela un capítulo concreto. */
     fun cancel(chapterId: String)
 
+    /** Elimina del dispositivo el capítulo descargado (archivos + estado). */
+    fun deleteChapter(chapterId: String)
+
+    /** Elimina la serie completa del dispositivo (archivos + base de datos). */
+    fun deleteSeries(seriesId: String)
+
     /** Cancela y limpia los archivos de una serie. */
     fun cancelSeries(seriesId: String)
 

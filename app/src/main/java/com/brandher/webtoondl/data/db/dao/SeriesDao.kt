@@ -5,6 +5,7 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.brandher.webtoondl.data.db.SeriesEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -18,7 +19,7 @@ data class SeriesWithStats(
 @Dao
 interface SeriesDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsert(series: SeriesEntity)
 
     @Query("SELECT * FROM series WHERE id = :id")

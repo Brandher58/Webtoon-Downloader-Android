@@ -5,13 +5,14 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.brandher.webtoondl.data.db.ChapterEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChapterDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertAll(chapters: List<ChapterEntity>)
 
     @Update
@@ -37,6 +38,15 @@ interface ChapterDao {
 
     @Query("SELECT * FROM chapters WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<String>): List<ChapterEntity>
+
+    @Query("SELECT * FROM chapters WHERE series_id = :seriesId")
+    suspend fun getForSeries(seriesId: String): List<ChapterEntity>
+
+    @Query("DELETE FROM chapters WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
+
+    @Query("UPDATE chapters SET queue_status = :status, pages_total = NULL, pages_done = 0, error = NULL WHERE id = :chapterId")
+    suspend fun resetDownload(chapterId: String, status: String)
 
     @Query("SELECT * FROM chapters WHERE queue_status IN (:statuses)")
     suspend fun getByStatuses(statuses: List<String>): List<ChapterEntity>

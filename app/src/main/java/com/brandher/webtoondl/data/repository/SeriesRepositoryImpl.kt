@@ -96,10 +96,33 @@ class SeriesRepositoryImpl @Inject constructor(
         val chapters = source.fetchChapters(series)
 
         seriesDao.upsert(series.toEntity())
-        chapterDao.deleteForSeries(series.id)
-        if (chapters.isNotEmpty()) {
-            chapterDao.upsertAll(chapters.map { it.toEntity() })
-        }
+
+        // Re-sincronización conservando el estado de descarga de capítulos ya existentes.
+        val fetched = chapters.map { it.toEntity() }
+        val existing = chapterDao.getByIds(fetched.map { it.id }).associateBy { it.id }
+        chapterDao.upsertAll(
+            fetched.map { fresh ->
+                val old = existing[fresh.id]
+                if (old == null) {
+                    fresh
+                } else {
+                    fresh.copy(
+                        queueStatus = old.queueStatus,
+                        pagesTotal = old.pagesTotal,
+                        pagesDone = old.pagesDone,
+                        outputFormat = old.outputFormat,
+                        error = old.error,
+                    )
+                }
+            },
+        )
+
+        // Elimina capítulos que ya no existen en la fuente, SOLO si no están descargados/encolados.
+        val fetchedIds = fetched.map { it.id }.toSet()
+        val stale = chapterDao.getForSeries(series.id)
+            .filter { it.id !in fetchedIds && it.queueStatus == "NONE" }
+        if (stale.isNotEmpty()) chapterDao.deleteByIds(stale.map { it.id })
+
         return series.id
     }
 

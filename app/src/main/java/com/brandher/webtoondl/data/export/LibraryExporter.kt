@@ -48,37 +48,40 @@ class LibraryExporter @Inject constructor(
 
             var exported = 0
             val tempFiles = mutableListOf<File>()
-            for (chapter in chapters) {
-                val files = storage.chapterFiles(chapter)
-                if (files.isEmpty()) continue
-                when (format) {
-                    OutputFormat.IMAGES -> {
-                        val chapterFolder = dir(resolver, seriesFolder, "Chapter ${pad(chapter.number)}")
-                            ?: continue
-                        files.forEach { file ->
-                            copyFile(resolver, chapterFolder, file.name, file)
+            try {
+                for (chapter in chapters) {
+                    val files = storage.chapterFiles(chapter)
+                    if (files.isEmpty()) continue
+                    when (format) {
+                        OutputFormat.IMAGES -> {
+                            val chapterFolder = dir(resolver, seriesFolder, "Chapter ${pad(chapter.number)}")
+                                ?: continue
+                            files.forEach { file ->
+                                copyFile(resolver, chapterFolder, file.name, file)
+                                exported++
+                            }
+                        }
+
+                        OutputFormat.CBZ -> {
+                            val temp = File(context.cacheDir, "export-${chapter.id}.cbz")
+                            Packager.packCbz(files, temp)
+                            tempFiles += temp
+                            copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.cbz", temp)
+                            exported++
+                        }
+
+                        OutputFormat.PDF -> {
+                            val temp = File(context.cacheDir, "export-${chapter.id}.pdf")
+                            Packager.packPdf(files, temp)
+                            tempFiles += temp
+                            copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.pdf", temp)
                             exported++
                         }
                     }
-
-                    OutputFormat.CBZ -> {
-                        val temp = File(context.cacheDir, "export-${chapter.id}.cbz")
-                        Packager.packCbz(files, temp)
-                        tempFiles += temp
-                        copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.cbz", temp)
-                        exported++
-                    }
-
-                    OutputFormat.PDF -> {
-                        val temp = File(context.cacheDir, "export-${chapter.id}.pdf")
-                        Packager.packPdf(files, temp)
-                        tempFiles += temp
-                        copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.pdf", temp)
-                        exported++
-                    }
                 }
+            } finally {
+                tempFiles.forEach { runCatching { it.delete() } }
             }
-            tempFiles.forEach { runCatching { it.delete() } }
 
             if (exported == 0) "No hay archivos descargados para exportar"
             else "Exportados $exported archivos de ${series.title}"

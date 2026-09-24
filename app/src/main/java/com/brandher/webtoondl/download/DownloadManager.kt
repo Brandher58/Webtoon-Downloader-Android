@@ -20,7 +20,6 @@ import com.brandher.webtoondl.domain.model.QueueItem
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.repo.DownloadRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -282,15 +281,16 @@ class DownloadManager @Inject constructor(
             pageDao.updateStatus(page.id, PageStatus.COMPLETED.name)
             return true
         }
-        if (target.exists()) target.delete()
 
         var attempt = 0
         while (true) {
             attempt++
             currentCoroutineContext().ensureActive()
             try {
-                withContext(Dispatchers.IO) { downloadToFile(page.url, target) }
-                if (target.length() > 0L) {
+                val ok = withContext(Dispatchers.IO) {
+                    PageFileDownloader.download(client, page.url, target, "$WEBTOONS_HOST/", DESKTOP_UA)
+                }
+                if (ok) {
                     pageDao.updateStatus(page.id, PageStatus.COMPLETED.name)
                     return true
                 }
@@ -307,36 +307,6 @@ class DownloadManager @Inject constructor(
                 }
                 delay(retryDelayMillis(rateLimited?.retryAfterSeconds, attempt))
             }
-        }
-    }
-
-    private fun downloadToFile(url: String, target: File) {
-        val tmp = File(target.parentFile, target.name + ".part")
-        tmp.parentFile?.mkdirs()
-        if (tmp.exists()) tmp.delete()
-
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", DESKTOP_UA)
-            .header("Referer", "$WEBTOONS_HOST/")
-            .header("Accept", "image/avif,image/webp,image/jpeg,image/png,*/*")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (response.code == 429) {
-                val retryAfter = response.header("Retry-After")?.toLongOrNull()
-                throw RateLimitedException(retryAfter, url)
-            }
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code} al obtener $url")
-            val body = response.body ?: throw IOException("Respuesta vacía: $url")
-            body.byteStream().use { input ->
-                tmp.outputStream().use { output -> input.copyTo(output) }
-            }
-        }
-
-        if (!tmp.renameTo(target)) {
-            tmp.copyTo(target, overwrite = true)
-            tmp.delete()
         }
     }
 

@@ -188,12 +188,14 @@ class WebtoonSource @Inject constructor(
     }
 
     private fun cardsIn(container: Element): List<SeriesRef> {
+        val base = WEBTOONS_HOST.toHttpUrlOrNull()
         val out = mutableListOf<SeriesRef>()
         val seen = mutableSetOf<String>()
         container.select("a[href*=title_no]").forEach { a ->
             val href = a.attr("href")
-            if (!href.contains("title_no=")) return@forEach
-            val titleNo = href.substringAfter("title_no=", "").substringBefore("&")
+            // Resuelve URLs relativas y extrae title_no de forma robusta (orden/params variables).
+            val resolved = base?.resolve(href) ?: return@forEach
+            val titleNo = resolved.queryParameter("title_no") ?: return@forEach
             if (titleNo.isBlank() || !seen.add(titleNo)) return@forEach
             val img = a.selectFirst("img") ?: return@forEach
             val src = img.attr("src").ifBlank { img.attr("data-src") }
@@ -202,14 +204,26 @@ class WebtoonSource @Inject constructor(
             val author = a.selectFirst("div.author")?.text()?.trim()?.ifBlank { null }
             val genre = a.selectFirst("div.genre")?.text()?.trim()?.ifBlank { null }
             out += SeriesRef(
-                url = href,
+                url = resolved.toString(),
                 title = title,
-                coverUrl = absCdn(src),
+                coverUrl = absImageUrl(src),
                 author = author,
                 genre = genre,
             )
         }
         return out
+    }
+
+    /** Expone el parseo de tarjetas para pruebas unitarias a partir de un HTML. */
+    internal fun cardsFromHtml(html: String): List<SeriesRef> = cardsIn(Jsoup.parse(html))
+
+    private fun absImageUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        return when {
+            url.startsWith("http") -> url
+            url.startsWith("//") -> "https:" + url
+            else -> WEBTOON_CDN_HOST + url
+        }
     }
 
     private val discoveryLanguages = setOf("de", "en", "es", "fr", "id", "th")

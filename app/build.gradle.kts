@@ -104,6 +104,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)

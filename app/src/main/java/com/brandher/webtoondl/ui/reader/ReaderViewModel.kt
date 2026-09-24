@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brandher.webtoondl.data.storage.StorageManager
 import com.brandher.webtoondl.domain.model.Chapter
+import com.brandher.webtoondl.domain.model.QueueStatus
+import com.brandher.webtoondl.domain.repo.DownloadRepository
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
@@ -25,6 +27,7 @@ data class ReaderUiState(
     val files: List<File> = emptyList(),
     val savedPageIndex: Int = 0,
     val loaded: Boolean = false,
+    val downloaded: Boolean = false,
 ) {
     val currentIndex: Int get() = chapters.indexOfFirst { it.id == chapter?.id }
 
@@ -38,6 +41,7 @@ data class ReaderUiState(
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val repository: SeriesRepository,
+    private val downloadRepository: DownloadRepository,
     private val storage: StorageManager,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -52,16 +56,20 @@ class ReaderViewModel @Inject constructor(
                 } else {
                     combine(
                         repository.observeSeries(chapter.seriesId),
-                        repository.observeChapterItems(chapter.seriesId).map { items -> items.map { it.chapter } },
+                        repository.observeChapterItems(chapter.seriesId),
                         repository.observeReadingPosition(chapter.id),
-                    ) { series, chapters, position ->
+                    ) { series, items, position ->
+                        val status = items.firstOrNull { it.chapter.id == chapter.id }?.status
                         ReaderUiState(
                             chapter = chapter,
                             seriesTitle = series?.title.orEmpty(),
-                            chapters = chapters,
-                            files = storage.chapterFiles(chapter.seriesId, chapter.number),
+                            chapters = items.map { it.chapter },
+                            files = storage.chapterFiles(chapter.seriesId, chapter.number)
+                                // Ignora archivos vacíos/corruptos para no mostrar en blanco.
+                                .filter { it.isFile && it.length() > 0L },
                             savedPageIndex = position?.pageIndex ?: 0,
                             loaded = true,
+                            downloaded = status == QueueStatus.COMPLETED,
                         )
                     }
                 }
@@ -76,6 +84,14 @@ class ReaderViewModel @Inject constructor(
         val chapter = uiState.value.chapter ?: return
         viewModelScope.launch {
             repository.saveReadingPosition(chapter.id, pageIndex, offsetPx)
+        }
+    }
+
+    /** Re-descarga el capítulo cuando está marcado como descargado pero faltan sus archivos. */
+    fun reDownload() {
+        if (!uiState.value.downloaded) return
+        viewModelScope.launch {
+            downloadRepository.enqueue(listOf(chapterId))
         }
     }
 }

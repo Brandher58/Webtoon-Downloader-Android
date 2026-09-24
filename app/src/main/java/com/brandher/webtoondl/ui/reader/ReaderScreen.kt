@@ -113,11 +113,29 @@ fun ReaderScreen(
                 color = Color.White,
             )
 
-            state.files.isEmpty() -> Text(
-                text = "Este capítulo no está descargado.",
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            state.files.isEmpty() -> Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = if (state.downloaded) {
+                        "Este capítulo está marcado como descargado, pero faltan los archivos."
+                    } else {
+                        "Este capítulo no está descargado."
+                    },
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                )
+                if (state.downloaded) {
+                    Button(onClick = { viewModel.reDownload() }) {
+                        Text("Re-descargar")
+                    }
+                }
+            }
 
             else -> {
                 val listState = rememberLazyListState()

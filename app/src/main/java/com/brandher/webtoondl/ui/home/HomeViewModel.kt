@@ -2,6 +2,7 @@ package com.brandher.webtoondl.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.brandher.webtoondl.data.prefs.HomeSectionsCodec
 import com.brandher.webtoondl.data.prefs.SettingsRepository
 import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.Series
@@ -9,6 +10,7 @@ import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +40,7 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val seriesRepository: SeriesRepository,
 ) : ViewModel() {
 
@@ -68,27 +70,38 @@ class HomeViewModel @Inject constructor(
 
     fun refreshHome() {
         viewModelScope.launch {
-            // Muestra al instante lo ya obtenido (funciona sin red) y refresca en segundo plano.
-            if (lastHomeSections.isNotEmpty()) {
+            // Muestra al instante lo cacheado (memoria o disco) y refresca en segundo plano.
+            if (lastHomeSections.isEmpty()) {
+                lastHomeSections = HomeSectionsCodec.decode(settingsRepository.getHomeSectionsCache())
+            }
+            _discovery.value = if (lastHomeSections.isNotEmpty()) {
+                DiscoveryUiState.Home(lastHomeSections)
+            } else {
+                DiscoveryUiState.Loading
+            }
+            fetchAsync()
+        }
+    }
+
+    private suspend fun fetchAsync() {
+        try {
+            val sections = seriesRepository.discoverHome()
+            if (sections.isNotEmpty()) {
+                lastHomeSections = sections
+                settingsRepository.saveHomeSectionsCache(HomeSectionsCodec.encode(sections))
+                _discovery.value = DiscoveryUiState.Home(sections)
+            } else if (lastHomeSections.isNotEmpty()) {
+                // Respuesta vacía (transitoria): conserva la caché y no la sobrescribes.
                 _discovery.value = DiscoveryUiState.Home(lastHomeSections)
             } else {
-                _discovery.value = DiscoveryUiState.Loading
+                _discovery.value = DiscoveryUiState.Error("No se pudieron cargar las recomendaciones")
             }
-            _discovery.value = try {
-                val sections = seriesRepository.discoverHome()
-                lastHomeSections = sections
-                if (sections.isNotEmpty()) {
-                    DiscoveryUiState.Home(sections)
-                } else {
-                    DiscoveryUiState.Error("No se pudieron cargar las recomendaciones")
-                }
-            } catch (e: Exception) {
-                // Sin red o error: conserva lo cacheado; si no hay nada, se muestra el error.
-                if (lastHomeSections.isEmpty()) {
-                    DiscoveryUiState.Error(e.message ?: "No se pudieron cargar las recomendaciones")
-                } else {
-                    _discovery.value
-                }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sin red o error: conserva lo ya mostrado; solo error si no hay nada que mostrar.
+            if (lastHomeSections.isEmpty()) {
+                _discovery.value = DiscoveryUiState.Error(e.message ?: "No se pudieron cargar las recomendaciones")
             }
         }
     }

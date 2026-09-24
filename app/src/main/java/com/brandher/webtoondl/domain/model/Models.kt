@@ -1,5 +1,7 @@
 package com.brandher.webtoondl.domain.model
 
+import kotlinx.serialization.Serializable
+
 /** Representa una serie en la biblioteca. [id] es la clave estable de la fuente. */
 data class Series(
     val id: String,
@@ -61,6 +63,7 @@ data class ChapterItem(
 )
 
 /** Referencia ligera de una serie (para búsqueda/recomendaciones). */
+@Serializable
 data class SeriesRef(
     val url: String,
     val title: String,
@@ -70,6 +73,7 @@ data class SeriesRef(
 )
 
 /** Sección de recomendaciones de la portada de la fuente. */
+@Serializable
 data class HomeSection(
     val title: String,
     val items: List<SeriesRef>,

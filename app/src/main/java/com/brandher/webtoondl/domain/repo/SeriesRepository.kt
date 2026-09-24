@@ -1,6 +1,8 @@
 package com.brandher.webtoondl.domain.repo
 
+import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesStats
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +13,12 @@ interface SeriesRepository {
     fun observeSeries(seriesId: String): Flow<Series?>
 
     fun observeChapterItems(seriesId: String): Flow<List<ChapterItem>>
+
+    fun observeChapter(chapterId: String): Flow<Chapter?>
+
+    fun observeReadingPosition(chapterId: String): Flow<ReadingPosition?>
+
+    suspend fun saveReadingPosition(chapterId: String, pageIndex: Int, offsetPx: Float)
 
     fun observeRecentSeries(limit: Int): Flow<List<Series>>
 

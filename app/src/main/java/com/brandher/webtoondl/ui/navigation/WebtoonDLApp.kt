@@ -19,13 +19,17 @@ import androidx.navigation.navArgument
 import com.brandher.webtoondl.ui.downloads.DownloadsScreen
 import com.brandher.webtoondl.ui.home.HomeScreen
 import com.brandher.webtoondl.ui.library.LibraryScreen
+import com.brandher.webtoondl.ui.reader.ReaderScreen
 import com.brandher.webtoondl.ui.series.SeriesScreen
 import com.brandher.webtoondl.ui.settings.SettingsScreen
 
 object Routes {
     const val SERIES = "series/{seriesId}"
+    const val READER = "reader/{chapterId}"
 
     fun series(seriesId: String): String = "series/$seriesId"
+
+    fun reader(chapterId: String): String = "reader/$chapterId"
 }
 
 @Composable
@@ -74,7 +78,20 @@ fun WebtoonDLApp() {
                 route = Routes.SERIES,
                 arguments = listOf(navArgument("seriesId") { type = NavType.StringType }),
             ) {
-                SeriesScreen(onBack = { navController.popBackStack() })
+                SeriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenReader = { chapterId -> navController.navigate(Routes.reader(chapterId)) },
+                )
+            }
+
+            composable(
+                route = Routes.READER,
+                arguments = listOf(navArgument("chapterId") { type = NavType.StringType }),
+            ) {
+                ReaderScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenChapter = { chapterId -> navController.navigate(Routes.reader(chapterId)) },
+                )
             }
         }
     }

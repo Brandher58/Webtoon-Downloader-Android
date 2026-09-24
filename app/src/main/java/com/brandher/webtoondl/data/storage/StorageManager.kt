@@ -42,8 +42,11 @@ class StorageManager @Inject constructor(
         return File(seriesDir(entity.seriesId), name)
     }
 
-    fun chapterFiles(entity: ChapterEntity): List<File> {
-        val dir = chapterDir(entity)
+    fun chapterFiles(entity: ChapterEntity): List<File> =
+        chapterFiles(entity.seriesId, entity.number)
+
+    fun chapterFiles(seriesId: String, chapterNumber: Int): List<File> {
+        val dir = chapterDir(seriesId, chapterNumber)
         if (!dir.isDirectory) return emptyList()
         return dir.listFiles { f -> f.isFile }?.sortedBy { it.name } ?: emptyList()
     }

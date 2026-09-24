@@ -69,6 +69,14 @@ data class SeriesStats(
     val downloadedChapters: Int,
 )
 
+/** Posición de lectura guardada de un capítulo. */
+data class ReadingPosition(
+    val chapterId: String,
+    val pageIndex: Int,
+    val offsetPx: Float,
+    val updatedAt: Long,
+)
+
 /** Estados de la cola de descargas para un capítulo. */
 enum class QueueStatus {
     /** Estado por defecto: aún no se ha encolado para descargar. */

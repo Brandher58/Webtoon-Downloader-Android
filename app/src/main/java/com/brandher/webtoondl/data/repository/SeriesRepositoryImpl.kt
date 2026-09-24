@@ -1,12 +1,16 @@
 package com.brandher.webtoondl.data.repository
 
 import com.brandher.webtoondl.data.db.dao.ChapterDao
+import com.brandher.webtoondl.data.db.dao.ReadingPositionDao
 import com.brandher.webtoondl.data.db.dao.SeriesDao
+import com.brandher.webtoondl.data.db.ReadingPositionEntity
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
+import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.QueueStatus
+import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
@@ -20,10 +24,28 @@ class SeriesRepositoryImpl @Inject constructor(
     private val sourceRegistry: SourceRegistry,
     private val seriesDao: SeriesDao,
     private val chapterDao: ChapterDao,
+    private val readingPositionDao: ReadingPositionDao,
 ) : SeriesRepository {
 
     override fun observeSeries(seriesId: String): Flow<Series?> =
         seriesDao.observeById(seriesId).map { it?.toDomain() }
+
+    override fun observeChapter(chapterId: String): Flow<Chapter?> =
+        chapterDao.observeById(chapterId).map { it?.toDomain() }
+
+    override fun observeReadingPosition(chapterId: String): Flow<ReadingPosition?> =
+        readingPositionDao.observeByChapter(chapterId).map { it?.toDomain() }
+
+    override suspend fun saveReadingPosition(chapterId: String, pageIndex: Int, offsetPx: Float) {
+        readingPositionDao.upsert(
+            ReadingPositionEntity(
+                chapterId = chapterId,
+                pageIndex = pageIndex,
+                offsetPx = offsetPx,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
 
     override fun observeChapterItems(seriesId: String): Flow<List<ChapterItem>> =
         chapterDao.observeForSeries(seriesId).map { entities ->

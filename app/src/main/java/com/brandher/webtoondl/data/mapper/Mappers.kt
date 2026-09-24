@@ -8,6 +8,16 @@ import com.brandher.webtoondl.domain.model.PageRef
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
 
+import com.brandher.webtoondl.data.db.ReadingPositionEntity
+import com.brandher.webtoondl.domain.model.ReadingPosition
+
+fun ReadingPositionEntity.toDomain() = ReadingPosition(
+    chapterId = chapterId,
+    pageIndex = pageIndex,
+    offsetPx = offsetPx,
+    updatedAt = updatedAt,
+)
+
 fun Series.toEntity(addedAt: Long = System.currentTimeMillis()) = SeriesEntity(
     id = id,
     sourceId = sourceId,

@@ -23,8 +23,8 @@ interface ChapterDao {
     @Query("UPDATE chapters SET queue_status = :status, error = :error WHERE id = :chapterId")
     suspend fun updateStatusError(chapterId: String, status: String, error: String?)
 
-    @Query("UPDATE chapters SET queue_status = :status, error = NULL, output_format = :format WHERE id = :chapterId")
-    suspend fun configureEnqueue(chapterId: String, format: String, status: String)
+    @Query("UPDATE chapters SET queue_status = :status, error = NULL WHERE id = :chapterId")
+    suspend fun configureEnqueue(chapterId: String, status: String)
 
     @Query("UPDATE chapters SET queue_status = :to, error = NULL WHERE queue_status IN (:fromStatuses)")
     suspend fun updateStatuses(fromStatuses: List<String>, to: String)
@@ -49,6 +49,9 @@ interface ChapterDao {
 
     @Query("SELECT * FROM chapters WHERE id = :chapterId")
     suspend fun getById(chapterId: String): ChapterEntity?
+
+    @Query("SELECT * FROM chapters WHERE series_id = :seriesId AND queue_status = :status ORDER BY number ASC")
+    suspend fun getForSeriesByStatus(seriesId: String, status: String): List<ChapterEntity>
 
     @Query("SELECT * FROM chapters WHERE id = :chapterId")
     fun observeById(chapterId: String): Flow<ChapterEntity?>

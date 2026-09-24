@@ -11,7 +11,6 @@ import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.LastReadInfo
-import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
@@ -70,7 +69,6 @@ class SeriesRepositoryImpl @Inject constructor(
                     status = QueueStatus.from(it.queueStatus),
                     pagesTotal = it.pagesTotal,
                     pagesDone = it.pagesDone,
-                    format = OutputFormat.from(it.outputFormat),
                 )
             }
         }

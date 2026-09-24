@@ -52,13 +52,12 @@ enum class OutputFormat {
     }
 }
 
-/** Capítulo con su estado de descarga y formato, para la UI. */
+/** Capítulo con su estado de descarga, para la UI. */
 data class ChapterItem(
     val chapter: Chapter,
     val status: QueueStatus,
     val pagesTotal: Int?,
     val pagesDone: Int,
-    val format: OutputFormat = OutputFormat.IMAGES,
 )
 
 /** Referencia ligera de una serie (para búsqueda/recomendaciones). */

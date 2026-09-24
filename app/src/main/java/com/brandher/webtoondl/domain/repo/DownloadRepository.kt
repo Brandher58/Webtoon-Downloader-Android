@@ -1,14 +1,13 @@
 package com.brandher.webtoondl.domain.repo
 
-import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.QueueItem
 import kotlinx.coroutines.flow.Flow
 
 /** Interfaz del gestor de descargas (cola, pausa, reanudación). */
 interface DownloadRepository {
 
-    /** Pone los capítulos indicados en cola con el formato de salida elegido. */
-    fun enqueue(chapterIds: List<String>, format: OutputFormat)
+    /** Pone los capítulos indicados en cola. Siempre se descargan imágenes para lectura local. */
+    fun enqueue(chapterIds: List<String>)
 
     /** Pausa todos los capítulos en curso. */
     fun pauseAll()

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brandher.webtoondl.data.export.LibraryExporter
+import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -62,12 +63,12 @@ class LibraryViewModel @Inject constructor(
             initialValue = LibraryUiState(),
         )
 
-    fun exportSeries(seriesId: String, treeUri: Uri) {
+    fun exportSeries(seriesId: String, format: OutputFormat, treeUri: Uri) {
         if (_exporting.value != null) return
         viewModelScope.launch {
             _exporting.value = seriesId
             _message.value = try {
-                exporter.exportSeries(seriesId, treeUri)
+                exporter.exportSeries(seriesId, format, treeUri)
             } catch (e: Exception) {
                 e.message ?: "No se pudo exportar"
             }

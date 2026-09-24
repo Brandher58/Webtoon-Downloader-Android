@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +29,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.SeriesStats
 import kotlinx.coroutines.delay
 
@@ -56,6 +60,8 @@ fun LibraryScreen(
     val exportingId by viewModel.exporting.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var pendingExport by remember { mutableStateOf<String?>(null) }
+    var pendingFormat by remember { mutableStateOf<OutputFormat?>(null) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -69,9 +75,12 @@ fun LibraryScreen(
             } catch (_: Exception) {
                 // Algunos proveedores no lo permiten; la copia funciona igualmente con el permiso temporal.
             }
-            pendingExport?.let { pending ->
-                viewModel.exportSeries(pending, uri)
-                pendingExport = null
+            val seriesId = pendingExport
+            val format = pendingFormat
+            pendingExport = null
+            pendingFormat = null
+            if (seriesId != null && format != null) {
+                viewModel.exportSeries(seriesId, format, uri)
             }
         }
     }
@@ -116,7 +125,7 @@ fun LibraryScreen(
                     },
                     onExport = {
                         pendingExport = item.stats.series.id
-                        exportLauncher.launch(null)
+                        showExportDialog = true
                     },
                 )
             }
@@ -147,6 +156,43 @@ fun LibraryScreen(
                 )
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Formato de exportación") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutputFormat.entries.forEach { format ->
+                        Row(Modifier.clickable {
+                            pendingFormat = format
+                            showExportDialog = false
+                            exportLauncher.launch(null)
+                        }) {
+                            Text(
+                                when (format) {
+                                    OutputFormat.IMAGES -> "Imágenes (carpetas)"
+                                    OutputFormat.CBZ -> "CBZ (cada capítulo en un archivo)"
+                                    OutputFormat.PDF -> "PDF (cada capítulo en un archivo)"
+                                },
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Después elige dónde guardarlo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 

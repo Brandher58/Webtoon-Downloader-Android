@@ -4,9 +4,12 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
-import androidx.core.net.toUri
+import com.brandher.webtoondl.data.db.dao.ChapterDao
 import com.brandher.webtoondl.data.db.dao.SeriesDao
 import com.brandher.webtoondl.data.storage.StorageManager
+import com.brandher.webtoondl.download.Packager
+import com.brandher.webtoondl.domain.model.OutputFormat
+import com.brandher.webtoondl.domain.model.QueueStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -15,55 +18,71 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Exporta las series descargadas a una ubicación elegida por el usuario vía SAF
- * (Storage Access Framework). No requiere permisos de almacenamiento.
+ * Exporta los capítulos descargados de una serie a una ubicación elegida por el usuario vía SAF
+ * (Storage Access Framework), en el formato indicado: imágenes, CBZ o PDF.
+ * La ruta se decide en el momento de exportar; la descarga local para lectura nunca se toca.
  */
 @Singleton
 class LibraryExporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val seriesDao: SeriesDao,
+    private val chapterDao: ChapterDao,
     private val storage: StorageManager,
 ) {
 
-    /** Copia la serie [seriesId] dentro del directorio elegido. Devuelve un mensaje de resultado. */
-    suspend fun exportSeries(seriesId: String, treeUri: Uri): String = withContext(Dispatchers.IO) {
-        val series = seriesDao.getById(seriesId) ?: return@withContext "Serie no encontrada"
-        val source = storage.seriesDir(seriesId)
-        if (!source.exists()) return@withContext "No hay archivos descargados de esta serie"
+    /** Exporta la serie [seriesId] (capítulos descargados) a [treeUri] en el [format] elegido. */
+    suspend fun exportSeries(seriesId: String, format: OutputFormat, treeUri: Uri): String =
+        withContext(Dispatchers.IO) {
+            val series = seriesDao.getById(seriesId) ?: return@withContext "Serie no encontrada"
+            val chapters = chapterDao.getForSeriesByStatus(seriesId, QueueStatus.COMPLETED.name)
 
-        val resolver = context.contentResolver
-        val rootDoc = documentOf(treeUri)
-        val rootFolder = dir(resolver, rootDoc, "Webtoon Downloader")
-            ?: return@withContext "No se pudo crear la carpeta de destino"
-        val seriesFolder = dir(resolver, rootFolder, sanitize(series.title))
-            ?: return@withContext "No se pudo crear la carpeta de la serie"
-
-        val files = source.walkTopDown().filter { it.isFile }.toList()
-        var copied = 0
-        for (file in files) {
-            val rel = file.relativeTo(source).path.replace('\\', '/')
-            val parts = rel.split('/')
-            var parent = seriesFolder
-            var ok = true
-            for (i in 0 until parts.lastIndex) {
-                val child = dir(resolver, parent, parts[i])
-                if (child == null || child == parent) {
-                    ok = false
-                    break
-                }
-                parent = child
+            if (chapters.isEmpty()) {
+                return@withContext "Primero descarga capítulos de ${series.title} para poder exportarlos"
             }
-            if (!ok) continue
-            copyFile(resolver, parent, parts.last(), file)
-            copied++
+
+            val resolver = context.contentResolver
+            val rootFolder = dir(resolver, documentOf(treeUri), "Webtoon Downloader")
+                ?: return@withContext "No se pudo crear la carpeta de destino"
+            val seriesFolder = dir(resolver, rootFolder, sanitize(series.title))
+                ?: return@withContext "No se pudo crear la carpeta de la serie"
+
+            var exported = 0
+            val tempFiles = mutableListOf<File>()
+            for (chapter in chapters) {
+                val files = storage.chapterFiles(chapter)
+                if (files.isEmpty()) continue
+                when (format) {
+                    OutputFormat.IMAGES -> {
+                        val chapterFolder = dir(resolver, seriesFolder, "Chapter ${pad(chapter.number)}")
+                            ?: continue
+                        files.forEach { file ->
+                            copyFile(resolver, chapterFolder, file.name, file)
+                            exported++
+                        }
+                    }
+
+                    OutputFormat.CBZ -> {
+                        val temp = File(context.cacheDir, "export-${chapter.id}.cbz")
+                        Packager.packCbz(files, temp)
+                        tempFiles += temp
+                        copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.cbz", temp)
+                        exported++
+                    }
+
+                    OutputFormat.PDF -> {
+                        val temp = File(context.cacheDir, "export-${chapter.id}.pdf")
+                        Packager.packPdf(files, temp)
+                        tempFiles += temp
+                        copyFile(resolver, seriesFolder, "Chapter ${pad(chapter.number)}.pdf", temp)
+                        exported++
+                    }
+                }
+            }
+            tempFiles.forEach { runCatching { it.delete() } }
+
+            if (exported == 0) "No hay archivos descargados para exportar"
+            else "Exportados $exported archivos de ${series.title}"
         }
-        val summary = if (copied == files.size) {
-            "Exportados $copied archivos de ${series.title}"
-        } else {
-            "Exportados $copied/${files.size} archivos de ${series.title}"
-        }
-        summary
-    }
 
     private fun copyFile(resolver: ContentResolver, parentDoc: Uri, name: String, file: File) {
         val doc = fileDoc(resolver, parentDoc, name) ?: return
@@ -112,11 +131,12 @@ class LibraryExporter @Inject constructor(
         return result
     }
 
-    /** Convierte una tree:// URI de SAF a su URI de documento raíz. */
     private fun documentOf(treeUri: Uri): Uri {
         val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
         return DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
     }
+
+    private fun pad(number: Int): String = number.toString().padStart(3, '0')
 
     private fun sanitize(name: String): String {
         val cleaned = name.replace(Regex("[^A-Za-z0-9_.\\- ]"), "_").trim()

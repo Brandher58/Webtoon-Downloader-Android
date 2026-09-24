@@ -1,5 +1,8 @@
 package com.brandher.webtoondl.ui.series
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -39,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -141,6 +146,34 @@ fun SeriesScreen(
 private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
+    var showExportDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingFormat by rememberSaveable { mutableStateOf<OutputFormat?>(null) }
+    var pendingSeriesId by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val exporting by vm.exporting.collectAsStateWithLifecycle()
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            val format = pendingFormat
+            val seriesId = pendingSeriesId
+            pendingFormat = null
+            pendingSeriesId = null
+            if (format != null && seriesId != null) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                } catch (_: Exception) {
+                    // Permiso persistente opcional; la copia funciona con el temporal.
+                }
+                vm.exportSeries(format, uri)
+            }
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -152,29 +185,9 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Descargar", style = MaterialTheme.typography.titleSmall)
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutputFormat.entries.forEach { fmt ->
-                    FilterChip(
-                        selected = state.format == fmt,
-                        onClick = { vm.setFormat(fmt) },
-                        label = {
-                            Text(
-                                when (fmt) {
-                                    OutputFormat.IMAGES -> "Imágenes"
-                                    OutputFormat.CBZ -> "CBZ"
-                                    OutputFormat.PDF -> "PDF"
-                                },
-                            )
-                        },
-                    )
-                }
-            }
-
+            Text("Descargar para leer", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "Las imágenes se guardan siempre (para leer aquí). " +
-                    "CBZ/PDF además generan el archivo del capítulo.",
+                text = "Se descargan las imágenes dentro de la app para leerlas sin conexión desde la Biblioteca.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -247,6 +260,27 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
                 }
             }
 
+            Text("Exportar archivos", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "Copia las imágenes o genera CBZ/PDF a la carpeta que elijas (solo capítulos descargados).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = {
+                    pendingSeriesId = state.series.id
+                    showExportDialog = true
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.downloadedCount > 0 && !exporting,
+            ) {
+                if (exporting) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text("Exportar descargados (${state.downloadedCount})")
+                }
+            }
+
             val notice by vm.notice.collectAsStateWithLifecycle()
             LaunchedEffect(notice) {
                 if (notice != null) {
@@ -262,6 +296,43 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
                 )
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Formato de exportación") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutputFormat.entries.forEach { format ->
+                        Row(Modifier.clickable {
+                            pendingFormat = format
+                            showExportDialog = false
+                            exportLauncher.launch(null)
+                        }) {
+                            Text(
+                                when (format) {
+                                    OutputFormat.IMAGES -> "Imágenes (carpetas)"
+                                    OutputFormat.CBZ -> "CBZ (cada capítulo en un archivo)"
+                                    OutputFormat.PDF -> "PDF (cada capítulo en un archivo)"
+                                },
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Después elige dónde guardarlo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 
@@ -361,12 +432,7 @@ private fun StatusBadge(item: ChapterItem) {
         QueueStatus.NONE -> Unit
         QueueStatus.COMPLETED -> AssistChip(
             onClick = {},
-            label = {
-                Text(
-                    item.pagesTotal?.let { "✓ $it · ${item.format.shortLabel}" }
-                        ?: item.format.shortLabel,
-                )
-            },
+            label = { Text(item.pagesTotal?.let { "✓ $it" } ?: "✓") },
             leadingIcon = { Icon(Icons.Filled.Check, contentDescription = "Descargado") },
         )
 

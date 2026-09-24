@@ -1,9 +1,11 @@
 package com.brandher.webtoondl.ui.series
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.brandher.webtoondl.data.export.LibraryExporter
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.QueueStatus
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface SeriesUiState {
     data object Loading : SeriesUiState
@@ -25,11 +28,11 @@ sealed interface SeriesUiState {
         val series: Series,
         val items: List<ChapterItem>,
         val selected: Set<String>,
-        val format: OutputFormat,
     ) : SeriesUiState {
         val totalChapters: Int get() = items.size
         val selectedCount: Int get() = selected.size
         val downloadable: List<ChapterItem> get() = items.filter { it.status != QueueStatus.COMPLETED }
+        val downloadedCount: Int get() = items.count { it.status == QueueStatus.COMPLETED }
     }
 }
 
@@ -37,32 +40,31 @@ sealed interface SeriesUiState {
 class SeriesViewModel @Inject constructor(
     seriesRepository: SeriesRepository,
     private val downloadRepository: DownloadRepository,
+    private val exporter: LibraryExporter,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val seriesId: String = checkNotNull(savedStateHandle["seriesId"])
 
     private val selected = MutableStateFlow<Set<String>>(emptySet())
-    private val format = MutableStateFlow(OutputFormat.IMAGES)
     private val _notice = MutableStateFlow<String?>(null)
+    private val _exporting = MutableStateFlow(false)
 
-    /** Aviso transitorio (p. ej. "ya está descargado"). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
+    val exporting: StateFlow<Boolean> = _exporting.asStateFlow()
 
     val uiState: StateFlow<SeriesUiState> =
         combine(
             seriesRepository.observeSeries(seriesId),
             seriesRepository.observeChapterItems(seriesId),
             selected,
-            format,
-        ) { series, items, selection, fmt ->
+        ) { series, items, selection ->
             when (series) {
                 null -> SeriesUiState.Loading
                 else -> SeriesUiState.Loaded(
                     series = series,
                     items = items,
                     selected = selection,
-                    format = fmt,
                 )
             }
         }.stateIn(
@@ -96,10 +98,6 @@ class SeriesViewModel @Inject constructor(
         val state = uiState.value as? SeriesUiState.Loaded ?: return
         val allIds = state.downloadable.map { it.chapter.id }.toSet()
         selected.value = if (selected.value == allIds) emptySet() else allIds
-    }
-
-    fun setFormat(fmt: OutputFormat) {
-        format.value = fmt
     }
 
     fun downloadSelected() {
@@ -136,13 +134,26 @@ class SeriesViewModel @Inject constructor(
         enqueueWithLog("rango $lo-$hi", ids)
     }
 
+    fun exportSeries(format: OutputFormat, treeUri: Uri) {
+        if (_exporting.value) return
+        viewModelScope.launch {
+            _exporting.value = true
+            _notice.value = try {
+                exporter.exportSeries(seriesId, format, treeUri)
+            } catch (e: Exception) {
+                e.message ?: "No se pudo exportar"
+            }
+            _exporting.value = false
+        }
+    }
+
     fun pauseAll() = downloadRepository.pauseAll()
 
     fun resumeAll() = downloadRepository.resumeAll()
 
     private fun enqueueWithLog(what: String, ids: List<String>) {
         Log.d(TAG, "encolando $what: ${ids.size} capítulos")
-        downloadRepository.enqueue(ids, format.value)
+        downloadRepository.enqueue(ids)
     }
 
     companion object {

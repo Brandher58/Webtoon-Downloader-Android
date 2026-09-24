@@ -14,7 +14,6 @@ import com.brandher.webtoondl.data.network.WEBTOONS_HOST
 import com.brandher.webtoondl.data.prefs.SettingsRepository
 import com.brandher.webtoondl.data.source.SourceRegistry
 import com.brandher.webtoondl.data.storage.StorageManager
-import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.PageStatus
 import com.brandher.webtoondl.domain.model.QueueItem
 import com.brandher.webtoondl.domain.model.QueueStatus
@@ -92,14 +91,14 @@ class DownloadManager @Inject constructor(
         scope.launch { processLoop() }
     }
 
-    override fun enqueue(chapterIds: List<String>, format: OutputFormat) {
+    override fun enqueue(chapterIds: List<String>) {
         if (chapterIds.isEmpty()) return
         scope.launch {
             val chapters = chapterDao.getByIds(chapterIds)
             var queued = 0
             chapters.forEach { entity ->
                 if (entity.queueStatus != QueueStatus.COMPLETED.name) {
-                    chapterDao.configureEnqueue(entity.id, format.name, QueueStatus.QUEUED.name)
+                    chapterDao.configureEnqueue(entity.id, QueueStatus.QUEUED.name)
                     queued++
                 } else {
                     Log.d(TAG, "enqueue: '${entity.title}' ya está COMPLETO, se omite")
@@ -240,10 +239,6 @@ class DownloadManager @Inject constructor(
             currentCoroutineContext().ensureActive()
 
             if (done == pages.size) {
-                val format = OutputFormat.from(entity.outputFormat)
-                if (format != OutputFormat.IMAGES) {
-                    packChapter(entity, format)
-                }
                 chapterDao.updateStatus(chapterId, QueueStatus.COMPLETED.name)
             } else {
                 chapterDao.updateStatusError(
@@ -320,21 +315,6 @@ class DownloadManager @Inject constructor(
         if (!tmp.renameTo(target)) {
             tmp.copyTo(target, overwrite = true)
             tmp.delete()
-        }
-    }
-
-    private suspend fun packChapter(entity: ChapterEntity, format: OutputFormat) {
-        val files = storage.chapterFiles(entity)
-        withContext(Dispatchers.IO) {
-            when (format) {
-                OutputFormat.CBZ ->
-                    Packager.packCbz(files, storage.archiveFile(entity, "cbz"))
-
-                OutputFormat.PDF ->
-                    Packager.packPdf(files, storage.archiveFile(entity, "pdf"))
-
-                OutputFormat.IMAGES -> Unit
-            }
         }
     }
 

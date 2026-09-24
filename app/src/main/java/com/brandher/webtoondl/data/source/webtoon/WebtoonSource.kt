@@ -96,8 +96,14 @@ class WebtoonSource @Inject constructor(
             if (lang != null) append("&readingLanguageCode=$lang")
         }
 
-        val responseBody = get(apiUrl, mobile = true)
-        val response = json.decodeFromString(EpisodesResponse.serializer(), responseBody)
+        // Reintenta una vez si la API devuelve lista vacía (vacíos transitorios).
+        var responseBody = get(apiUrl, mobile = true)
+        var response = json.decodeFromString(EpisodesResponse.serializer(), responseBody)
+        if (response.result.episodeList.isEmpty()) {
+            kotlinx.coroutines.delay(300)
+            responseBody = get(apiUrl, mobile = true)
+            response = json.decodeFromString(EpisodesResponse.serializer(), responseBody)
+        }
 
         return response.result.episodeList.mapIndexed { index, episode ->
             Chapter(

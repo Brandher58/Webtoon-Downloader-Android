@@ -3,6 +3,10 @@ package com.brandher.webtoondl.di
 import android.content.Context
 import androidx.room.Room
 import com.brandher.webtoondl.data.db.AppDatabase
+import com.brandher.webtoondl.data.db.dao.ChapterDao
+import com.brandher.webtoondl.data.db.dao.PageDao
+import com.brandher.webtoondl.data.db.dao.ReadingPositionDao
+import com.brandher.webtoondl.data.db.dao.SeriesDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,4 +27,16 @@ object DatabaseModule {
             // Temporal: se definirán migraciones reales al estabilizar el esquema en las primeras etapas.
             .fallbackToDestructiveMigration()
             .build()
+
+    @Provides
+    fun provideSeriesDao(db: AppDatabase): SeriesDao = db.seriesDao()
+
+    @Provides
+    fun provideChapterDao(db: AppDatabase): ChapterDao = db.chapterDao()
+
+    @Provides
+    fun providePageDao(db: AppDatabase): PageDao = db.pageDao()
+
+    @Provides
+    fun provideReadingPositionDao(db: AppDatabase): ReadingPositionDao = db.readingPositionDao()
 }

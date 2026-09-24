@@ -10,14 +10,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.brandher.webtoondl.ui.downloads.DownloadsScreen
 import com.brandher.webtoondl.ui.home.HomeScreen
 import com.brandher.webtoondl.ui.library.LibraryScreen
+import com.brandher.webtoondl.ui.series.SeriesScreen
 import com.brandher.webtoondl.ui.settings.SettingsScreen
+
+object Routes {
+    const val SERIES = "series/{seriesId}"
+
+    fun series(seriesId: String): String = "series/$seriesId"
+}
 
 @Composable
 fun WebtoonDLApp() {
@@ -52,10 +61,19 @@ fun WebtoonDLApp() {
             startDestination = Destination.Home.route,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Destination.Home.route) { HomeScreen() }
+            composable(Destination.Home.route) {
+                HomeScreen(onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) })
+            }
             composable(Destination.Library.route) { LibraryScreen() }
             composable(Destination.Downloads.route) { DownloadsScreen() }
             composable(Destination.Settings.route) { SettingsScreen() }
+
+            composable(
+                route = Routes.SERIES,
+                arguments = listOf(navArgument("seriesId") { type = NavType.StringType }),
+            ) {
+                SeriesScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

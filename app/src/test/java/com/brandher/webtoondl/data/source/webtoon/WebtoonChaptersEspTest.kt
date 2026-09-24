@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Reproducción: la escena "Amor dulce, convivencia ardiente" (title_no=9360)
- * no cargaba capítulos en el dispositivo.
+ * Regresión: varias escenas españolas devolvían listas de capítulos vacías en el dispositivo
+ * (límite temporal de peticiones). Verifica que la fuente las obtiene correctamente.
  */
 class WebtoonChaptersEspTest {
 
@@ -29,6 +29,15 @@ class WebtoonChaptersEspTest {
         println("SERIE: ${series.title} / id=${series.id}")
         val chapters = source.fetchChapters(series)
         println("CH: ${chapters.size} first=${chapters.firstOrNull()?.id} viewer=${chapters.firstOrNull()?.viewerUrl}")
-        assertTrue("La escena 9360 debe tener capítulos", chapters.isNotEmpty())
+        assertTrue("Amor dulce (9360) debe tener capítulos", chapters.isNotEmpty())
+    }
+
+    @Test
+    fun fetchEs_Gloton11214() = runBlocking {
+        val url = "https://www.webtoons.com/es/fantasy/the-glutton-devourer-of-kings/list?title_no=11214"
+        val series = source.fetchSeries(url)
+        val chapters = source.fetchChapters(series)
+        println("GLOTON: ${chapters.size} first=${chapters.firstOrNull()?.id}")
+        assertTrue("Glotón (11214) debe tener capítulos", chapters.isNotEmpty())
     }
 }

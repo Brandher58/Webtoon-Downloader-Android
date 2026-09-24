@@ -14,6 +14,7 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -30,6 +31,9 @@ private const val MOBILE_UA =
         "Chrome/110.0.0.0 Mobile Safari/537.36"
 
 private val json = Json { ignoreUnknownKeys = true }
+
+/** Intentos de la API de episodios cuando devuelve lista vacía (límite temporal de peticiones). */
+private const val MAX_EPISODES_ATTEMPTS = 3
 
 /**
  * Adaptador de la fuente webtoons.com (sitio oficial).
@@ -96,14 +100,8 @@ class WebtoonSource @Inject constructor(
             if (lang != null) append("&readingLanguageCode=$lang")
         }
 
-        // Reintenta una vez si la API devuelve lista vacía (vacíos transitorios).
-        var responseBody = get(apiUrl, mobile = true)
-        var response = json.decodeFromString(EpisodesResponse.serializer(), responseBody)
-        if (response.result.episodeList.isEmpty()) {
-            kotlinx.coroutines.delay(300)
-            responseBody = get(apiUrl, mobile = true)
-            response = json.decodeFromString(EpisodesResponse.serializer(), responseBody)
-        }
+        // Consume la API de episodios; si devuelve lista vacía (límite temporal), reintenta con backoff.
+        val response = fetchEpisodesWithRetry(apiUrl)
 
         return response.result.episodeList.mapIndexed { index, episode ->
             Chapter(
@@ -220,6 +218,17 @@ class WebtoonSource @Inject constructor(
             lang in discoveryLanguages -> lang
             else -> "en"
         }
+    }
+
+    private suspend fun fetchEpisodesWithRetry(apiUrl: String): EpisodesResponse {
+        var response = json.decodeFromString(EpisodesResponse.serializer(), get(apiUrl, mobile = true))
+        var attempt = 1
+        while (response.result.episodeList.isEmpty() && attempt < MAX_EPISODES_ATTEMPTS) {
+            delay(1_000L * attempt)
+            response = json.decodeFromString(EpisodesResponse.serializer(), get(apiUrl, mobile = true))
+            attempt++
+        }
+        return response
     }
 
     private suspend fun get(url: String, mobile: Boolean): String = withContext(Dispatchers.IO) {

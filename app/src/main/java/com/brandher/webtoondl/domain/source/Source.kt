@@ -38,3 +38,7 @@ interface Source {
 
 /** Señaliza que ninguna fuente soporta la URL proporcionada. */
 class UnsupportedUrlException(url: String) : Exception("Ninguna fuente soporta la URL: $url")
+
+/** Se lanza cuando la fuente no devuelve capítulos (posible límite temporal de peticiones). */
+class NoChaptersFoundException(val title: String) :
+    Exception("No se pudieron cargar los capítulos de \"$title\". Es posible que el servidor esté limitando las peticiones; inténtalo de nuevo en unos segundos.")

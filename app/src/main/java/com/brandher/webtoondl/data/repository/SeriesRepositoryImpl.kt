@@ -17,6 +17,7 @@ import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
+import com.brandher.webtoondl.domain.source.NoChaptersFoundException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -94,6 +95,9 @@ class SeriesRepositoryImpl @Inject constructor(
         val source = sourceRegistry.match(url)
         val series = source.fetchSeries(url)
         val chapters = source.fetchChapters(series)
+
+        // Una respuesta sin capítulos no debe crear una serie "fantasma": se avisa al usuario y no se guarda.
+        if (chapters.isEmpty()) throw NoChaptersFoundException(series.title)
 
         // Re-sincronización conservando el estado de descarga de capítulos ya existentes (escritura atómica).
         val fetched = chapters.map { it.toEntity() }

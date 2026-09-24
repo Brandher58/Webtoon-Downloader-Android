@@ -194,7 +194,7 @@ fun HomeScreen(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(170.dp)
+                                                .height(190.dp)
                                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                                             contentAlignment = Alignment.Center,
                                         ) {
@@ -209,7 +209,7 @@ fun HomeScreen(
                                         }
                                         Text(
                                             text = item.title,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.titleSmall,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.padding(8.dp),

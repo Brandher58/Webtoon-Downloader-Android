@@ -104,11 +104,13 @@ class DownloadManager @Inject constructor(
             val chapters = chapterIds.chunked(SqlBatch.SIZE).flatMap { chapterDao.getByIds(it) }
             var queued = 0
             chapters.forEach { entity ->
-                if (entity.queueStatus != QueueStatus.COMPLETED.name) {
+                val status = QueueStatus.from(entity.queueStatus)
+                val filesExist = storage.chapterFiles(entity).isNotEmpty()
+                if (QueuePolicy.shouldRequeue(status, filesExist)) {
                     chapterDao.configureEnqueue(entity.id, QueueStatus.QUEUED.name)
                     queued++
                 } else {
-                    Log.d(TAG, "enqueue: '${entity.title}' ya está COMPLETO, se omite")
+                    Log.d(TAG, "enqueue: '${entity.title}' ya está completo con archivos, se omite")
                 }
             }
             Log.d(TAG, "enqueue: ${chapterIds.size} pedidos, $queued encolados")

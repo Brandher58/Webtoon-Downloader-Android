@@ -119,7 +119,7 @@ class SeriesViewModel @Inject constructor(
 
     fun downloadSelected() {
         val state = uiState.value as? SeriesUiState.Loaded ?: return
-        val ids = state.items.filter { it.chapter.id in selected.value && it.status != QueueStatus.COMPLETED }
+        val ids = state.items.filter { it.chapter.id in selected.value }
             .map { it.chapter.id }
         selected.value = emptySet()
         if (ids.isEmpty()) return
@@ -128,9 +128,9 @@ class SeriesViewModel @Inject constructor(
 
     fun downloadAll() {
         val state = uiState.value as? SeriesUiState.Loaded ?: return
-        val ids = state.downloadable.map { it.chapter.id }
+        val ids = state.items.map { it.chapter.id }
         if (ids.isEmpty()) {
-            _notice.value = "Todos los capítulos ya están descargados"
+            _notice.value = "No hay capítulos para descargar"
             return
         }
         enqueueWithLog("todo", ids)
@@ -141,11 +141,11 @@ class SeriesViewModel @Inject constructor(
         val lo = minOf(from, to)
         val hi = maxOf(from, to)
         val ids = state.items
-            .filter { it.chapter.number in lo..hi && it.status != QueueStatus.COMPLETED }
+            .filter { it.chapter.number in lo..hi }
             .map { it.chapter.id }
         Log.d(TAG, "downloadRange($from,$to) -> lo=$lo hi=$hi ids=${ids.size} (estado=${state.items.size})")
         if (ids.isEmpty()) {
-            _notice.value = "El rango ya está descargado (o no existe)"
+            _notice.value = "No hay capítulos en ese rango"
             return
         }
         enqueueWithLog("rango $lo-$hi", ids)

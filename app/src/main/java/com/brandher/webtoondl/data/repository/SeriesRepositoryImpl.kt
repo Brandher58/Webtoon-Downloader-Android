@@ -8,6 +8,7 @@ import com.brandher.webtoondl.data.source.SourceRegistry
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,6 +39,17 @@ class SeriesRepositoryImpl @Inject constructor(
 
     override fun observeRecentSeries(limit: Int): Flow<List<Series>> =
         seriesDao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
+
+    override fun observeLibrary(): Flow<List<SeriesStats>> =
+        seriesDao.observeAllWithStats().map { rows ->
+            rows.map {
+                SeriesStats(
+                    series = it.series.toDomain(),
+                    totalChapters = it.totalChapters,
+                    downloadedChapters = it.downloadedChapters,
+                )
+            }
+        }
 
     override suspend fun getSeries(seriesId: String): Series? =
         seriesDao.getById(seriesId)?.toDomain()

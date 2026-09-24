@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,6 +48,7 @@ import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -234,6 +236,21 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
                     Text("Reanudar")
                 }
             }
+
+            val notice by vm.notice.collectAsStateWithLifecycle()
+            LaunchedEffect(notice) {
+                if (notice != null) {
+                    delay(3_000)
+                    vm.consumeNotice()
+                }
+            }
+            notice?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }
@@ -291,7 +308,11 @@ private fun ChapterRow(
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(checked = selected, onCheckedChange = { onToggle() })
+            Checkbox(
+                checked = selected,
+                onCheckedChange = { onToggle() },
+                enabled = item.status != QueueStatus.COMPLETED,
+            )
             Text(
                 text = item.chapter.number.toString(),
                 style = MaterialTheme.typography.titleMedium,

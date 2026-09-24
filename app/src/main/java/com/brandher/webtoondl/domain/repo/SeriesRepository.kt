@@ -2,6 +2,7 @@ package com.brandher.webtoondl.domain.repo
 
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesStats
 import kotlinx.coroutines.flow.Flow
 
 /** Interfaz del repositorio de series/capítulos. */
@@ -12,6 +13,9 @@ interface SeriesRepository {
     fun observeChapterItems(seriesId: String): Flow<List<ChapterItem>>
 
     fun observeRecentSeries(limit: Int): Flow<List<Series>>
+
+    /** Lista de series con el resumen de descargas (biblioteca). */
+    fun observeLibrary(): Flow<List<SeriesStats>>
 
     suspend fun getSeries(seriesId: String): Series?
 

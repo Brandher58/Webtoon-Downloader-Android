@@ -62,6 +62,13 @@ data class QueueItem(
     val pagesDone: Int,
 )
 
+/** Serie con resumen de descargas, para la biblioteca. */
+data class SeriesStats(
+    val series: Series,
+    val totalChapters: Int,
+    val downloadedChapters: Int,
+)
+
 /** Estados de la cola de descargas para un capítulo. */
 enum class QueueStatus {
     /** Estado por defecto: aún no se ha encolado para descargar. */

@@ -3,6 +3,7 @@ package com.brandher.webtoondl.download
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.dao.ChapterDao
 import com.brandher.webtoondl.data.db.dao.PageDao
@@ -90,9 +91,17 @@ class DownloadManager @Inject constructor(
     override fun enqueue(chapterIds: List<String>, format: OutputFormat) {
         if (chapterIds.isEmpty()) return
         scope.launch {
-            chapterDao.getByIds(chapterIds).forEach { entity ->
-                chapterDao.configureEnqueue(entity.id, format.name, QueueStatus.QUEUED.name)
+            val chapters = chapterDao.getByIds(chapterIds)
+            var queued = 0
+            chapters.forEach { entity ->
+                if (entity.queueStatus != QueueStatus.COMPLETED.name) {
+                    chapterDao.configureEnqueue(entity.id, format.name, QueueStatus.QUEUED.name)
+                    queued++
+                } else {
+                    Log.d(TAG, "enqueue: '${entity.title}' ya está COMPLETO, se omite")
+                }
             }
+            Log.d(TAG, "enqueue: ${chapterIds.size} pedidos, $queued encolados")
         }
     }
 
@@ -347,6 +356,8 @@ class DownloadManager @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "DownloadManager"
+
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

@@ -21,8 +21,24 @@ data class SeriesWithStats(
 @Dao
 interface SeriesDao {
 
-    @Upsert
-    suspend fun upsert(series: SeriesEntity)
+    /** Inserta la serie solo si no existe; nunca borra la existente (evita cascade sobre capítulos). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(series: SeriesEntity)
+
+    /** Actualiza solo metadatos de la serie, sin tocar la fila ni sus hijos. */
+    @Query(
+        """UPDATE series SET url = :url, title = :title, cover_url = :coverUrl,
+           author = :author, genre = :genre, summary = :summary WHERE id = :id""",
+    )
+    suspend fun updateSeriesMetadata(
+        id: String,
+        url: String,
+        title: String,
+        coverUrl: String?,
+        author: String?,
+        genre: String?,
+        summary: String?,
+    )
 
     @Query("SELECT * FROM series WHERE id = :id")
     suspend fun getById(id: String): SeriesEntity?

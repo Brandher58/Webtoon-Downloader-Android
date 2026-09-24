@@ -5,6 +5,7 @@ import com.brandher.webtoondl.data.db.dao.ReadingPositionDao
 import com.brandher.webtoondl.data.db.dao.SeriesDao
 import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.ReadingPositionEntity
+import com.brandher.webtoondl.data.db.SeriesEntity
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
@@ -97,7 +98,7 @@ class SeriesRepositoryImpl @Inject constructor(
         val source = sourceRegistry.match(series.url)
         val chapters = source.fetchChapters(series)
         if (chapters.isEmpty()) return 0
-        seriesDao.upsert(series.toEntity())
+        persistSeries(series.toEntity())
         persistChapters(chapters.map { it.toEntity() })
         return chapters.size
     }
@@ -110,9 +111,23 @@ class SeriesRepositoryImpl @Inject constructor(
         // Una respuesta sin capítulos no debe crear una serie "fantasma": se avisa al usuario y no se guarda.
         if (chapters.isEmpty()) throw NoChaptersFoundException(series.title)
 
-        seriesDao.upsert(series.toEntity())
+        persistSeries(series.toEntity())
         persistChapters(chapters.map { it.toEntity() })
         return series.id
+    }
+
+    /** Escribe la serie sin borrar: inserta si falta y actualiza metadatos. */
+    private suspend fun persistSeries(series: SeriesEntity) {
+        seriesDao.insertIfAbsent(series)
+        seriesDao.updateSeriesMetadata(
+            id = series.id,
+            url = series.url,
+            title = series.title,
+            coverUrl = series.coverUrl,
+            author = series.author,
+            genre = series.genre,
+            summary = series.summary,
+        )
     }
 
     /** Inserta/actualiza capítulos conservando el estado de descarga de los ya existentes. */

@@ -40,17 +40,40 @@ enum class OutputFormat {
     CBZ,
     PDF;
 
+    val shortLabel: String
+        get() = when (this) {
+            IMAGES -> "imágenes"
+            CBZ -> "cbz"
+            PDF -> "pdf"
+        }
+
     companion object {
         fun from(name: String): OutputFormat = entries.firstOrNull { it.name == name } ?: IMAGES
     }
 }
 
-/** Capítulo junto con su estado de descarga, para la UI. */
+/** Capítulo con su estado de descarga y formato, para la UI. */
 data class ChapterItem(
     val chapter: Chapter,
     val status: QueueStatus,
     val pagesTotal: Int?,
     val pagesDone: Int,
+    val format: OutputFormat = OutputFormat.IMAGES,
+)
+
+/** Referencia ligera de una serie (para búsqueda/recomendaciones). */
+data class SeriesRef(
+    val url: String,
+    val title: String,
+    val coverUrl: String?,
+    val author: String?,
+    val genre: String?,
+)
+
+/** Sección de recomendaciones de la portada de la fuente. */
+data class HomeSection(
+    val title: String,
+    val items: List<SeriesRef>,
 )
 
 /** Elemento de la cola de descargas, con el título de la serie. */

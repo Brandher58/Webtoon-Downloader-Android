@@ -12,4 +12,7 @@ class SourceRegistry @Inject constructor(
 ) {
     fun match(url: String): Source =
         sources.firstOrNull { it.canHandle(url) } ?: throw UnsupportedUrlException(url)
+
+    /** Fuente principal (búsqueda y recomendaciones). */
+    val primary: Source get() = sources.first()
 }

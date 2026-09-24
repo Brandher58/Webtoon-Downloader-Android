@@ -3,7 +3,9 @@ package com.brandher.webtoondl.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brandher.webtoondl.data.prefs.SettingsRepository
+import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -14,6 +16,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+sealed interface DiscoveryUiState {
+    data object Loading : DiscoveryUiState
+    data class Home(val sections: List<HomeSection>) : DiscoveryUiState
+    data class SearchResults(val query: String, val items: List<SeriesRef>) : DiscoveryUiState
+    data class Error(val message: String) : DiscoveryUiState
+}
 
 sealed interface AddUrlState {
     data object Idle : AddUrlState
@@ -33,8 +42,13 @@ class HomeViewModel @Inject constructor(
     private val seriesRepository: SeriesRepository,
 ) : ViewModel() {
 
+    private val _discovery = MutableStateFlow<DiscoveryUiState>(DiscoveryUiState.Loading)
+    val discovery: StateFlow<DiscoveryUiState> = _discovery.asStateFlow()
+
     private val _addUrlState = MutableStateFlow<AddUrlState>(AddUrlState.Idle)
     val addUrlState: StateFlow<AddUrlState> = _addUrlState.asStateFlow()
+
+    private var lastHomeSections: List<HomeSection> = emptyList()
 
     val uiState: StateFlow<HomeUiState> =
         combine(
@@ -47,6 +61,40 @@ class HomeViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = HomeUiState(),
         )
+
+    init {
+        refreshHome()
+    }
+
+    fun refreshHome() {
+        viewModelScope.launch {
+            _discovery.value = DiscoveryUiState.Loading
+            _discovery.value = try {
+                val sections = seriesRepository.discoverHome()
+                lastHomeSections = sections
+                DiscoveryUiState.Home(sections)
+            } catch (e: Exception) {
+                DiscoveryUiState.Error(e.message ?: "No se pudieron cargar las recomendaciones")
+            }
+        }
+    }
+
+    fun showHome() {
+        _discovery.value = DiscoveryUiState.Home(lastHomeSections)
+    }
+
+    fun search(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        viewModelScope.launch {
+            _discovery.value = DiscoveryUiState.Loading
+            _discovery.value = try {
+                DiscoveryUiState.SearchResults(q, seriesRepository.search(q))
+            } catch (e: Exception) {
+                DiscoveryUiState.Error(e.message ?: "No se pudo realizar la búsqueda")
+            }
+        }
+    }
 
     fun addUrl(rawUrl: String) {
         val url = rawUrl.trim()

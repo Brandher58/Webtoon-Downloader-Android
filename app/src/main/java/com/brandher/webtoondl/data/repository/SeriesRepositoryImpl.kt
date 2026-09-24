@@ -9,10 +9,13 @@ import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
 import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.LastReadInfo
+import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import javax.inject.Inject
@@ -67,6 +70,7 @@ class SeriesRepositoryImpl @Inject constructor(
                     status = QueueStatus.from(it.queueStatus),
                     pagesTotal = it.pagesTotal,
                     pagesDone = it.pagesDone,
+                    format = OutputFormat.from(it.outputFormat),
                 )
             }
         }
@@ -104,4 +108,10 @@ class SeriesRepositoryImpl @Inject constructor(
     override suspend fun deleteSeries(seriesId: String) {
         seriesDao.deleteById(seriesId)
     }
+
+    override suspend fun discoverHome(): List<HomeSection> =
+        sourceRegistry.primary.homeSections()
+
+    override suspend fun search(keyword: String): List<SeriesRef> =
+        sourceRegistry.primary.search(keyword)
 }

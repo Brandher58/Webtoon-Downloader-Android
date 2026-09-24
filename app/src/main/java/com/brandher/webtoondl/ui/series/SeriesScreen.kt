@@ -172,6 +172,13 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
                 }
             }
 
+            Text(
+                text = "Las imágenes se guardan siempre (para leer aquí). " +
+                    "CBZ/PDF además generan el archivo del capítulo.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -354,7 +361,12 @@ private fun StatusBadge(item: ChapterItem) {
         QueueStatus.NONE -> Unit
         QueueStatus.COMPLETED -> AssistChip(
             onClick = {},
-            label = { Text(item.pagesTotal?.let { "✓ $it" } ?: "✓") },
+            label = {
+                Text(
+                    item.pagesTotal?.let { "✓ $it · ${item.format.shortLabel}" }
+                        ?: item.format.shortLabel,
+                )
+            },
             leadingIcon = { Icon(Icons.Filled.Check, contentDescription = "Descargado") },
         )
 

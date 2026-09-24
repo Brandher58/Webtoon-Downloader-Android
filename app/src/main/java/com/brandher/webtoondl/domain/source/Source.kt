@@ -1,8 +1,10 @@
 package com.brandher.webtoondl.domain.source
 
 import com.brandher.webtoondl.domain.model.Chapter
+import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.PageRef
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesRef
 
 /**
  * Adaptador de una fuente de webtoons. La UI y el motor de descargas dependen de esta
@@ -26,6 +28,12 @@ interface Source {
 
     /** Obtiene las URLs de las páginas (imágenes) de un capítulo. */
     suspend fun fetchPages(chapter: Chapter): List<PageRef>
+
+    /** Busca series por nombre. Devuelve vacío si la fuente no soporta búsqueda. */
+    suspend fun search(keyword: String): List<SeriesRef> = emptyList()
+
+    /** Secciones de recomendaciones de la portada. Devuelve vacío si no hay. */
+    suspend fun homeSections(): List<HomeSection> = emptyList()
 }
 
 /** Señaliza que ninguna fuente soporta la URL proporcionada. */

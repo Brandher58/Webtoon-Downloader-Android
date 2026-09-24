@@ -2,9 +2,11 @@ package com.brandher.webtoondl.domain.repo
 
 import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.LastReadInfo
 import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.model.SeriesStats
 import kotlinx.coroutines.flow.Flow
 
@@ -23,6 +25,12 @@ interface SeriesRepository {
 
     /** Última posición leída de cada serie (para "Continuar leyendo"). */
     fun observeLastReadAll(): Flow<List<LastReadInfo>>
+
+    /** Secciones de recomendaciones de la fuente principal. */
+    suspend fun discoverHome(): List<HomeSection>
+
+    /** Busca series por nombre en la fuente principal. */
+    suspend fun search(keyword: String): List<SeriesRef>
 
     fun observeRecentSeries(limit: Int): Flow<List<Series>>
 

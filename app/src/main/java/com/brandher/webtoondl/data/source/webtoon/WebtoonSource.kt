@@ -4,10 +4,13 @@ import com.brandher.webtoondl.data.network.WEBTOONS_HOST
 import com.brandher.webtoondl.data.network.WEBTOONS_MOBILE_HOST
 import com.brandher.webtoondl.data.network.WEBTOON_CDN_HOST
 import com.brandher.webtoondl.domain.model.Chapter
+import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.PageRef
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.source.Source
 import java.io.IOException
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +20,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 private const val DESKTOP_UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -123,6 +127,92 @@ class WebtoonSource @Inject constructor(
         return images.mapIndexed { index, url ->
             val clean = url.substringBefore("?").ifEmpty { url }
             PageRef(pageNo = index + 1, url = clean)
+        }
+    }
+
+    override suspend fun search(keyword: String): List<SeriesRef> {
+        val url = WEBTOONS_HOST.toHttpUrlOrNull()
+            ?.newBuilder()
+            ?.addPathSegments(discoveryLang())
+            ?.addPathSegments("search/originals")
+            ?.addQueryParameter("keyword", keyword)
+            ?.addQueryParameter("page", "1")
+            ?.build()
+            ?.toString() ?: return emptyList()
+        val body = get(url, mobile = false)
+        return withContext(Dispatchers.Default) { cardsIn(Jsoup.parse(body)) }
+    }
+
+    override suspend fun homeSections(): List<HomeSection> = withContext(Dispatchers.Default) {
+        val lang = discoveryLang()
+        val home = runCatching { get("$WEBTOONS_HOST/$lang/", mobile = false) }.getOrNull()
+            ?: return@withContext emptyList()
+        val originals = runCatching { get("$WEBTOONS_HOST/$lang/originals", mobile = false) }.getOrNull()
+
+        val sections = mutableListOf<HomeSection>()
+        val homeDoc = Jsoup.parse(home)
+
+        val definitions = listOf(
+            "section.main_section" to "En tendencia",
+            "#_ranking_tab_section" to "Populares por categoría",
+            "#_daily_tab_section" to "Diarias",
+            "#_canvas" to "Creadores indie",
+        )
+        for ((selector, label) in definitions) {
+            val node = homeDoc.selectFirst(selector) ?: continue
+            val cards = cardsIn(node)
+            if (cards.isNotEmpty()) sections += HomeSection(label, cards)
+        }
+
+        if (originals != null) {
+            val originalCards = cardsIn(Jsoup.parse(originals))
+            if (originalCards.isNotEmpty()) sections += HomeSection("Todos los originales", originalCards)
+        }
+
+        // Refuerzo con el ranking si la portada no trajo nada.
+        if (sections.isEmpty()) {
+            val ranking = runCatching { get("$WEBTOONS_HOST/$lang/ranking/originals", mobile = false) }
+                .getOrNull()?.let { cardsIn(Jsoup.parse(it)) }.orEmpty()
+            if (ranking.isNotEmpty()) sections += HomeSection("Ranking", ranking)
+        }
+
+        sections
+    }
+
+    private fun cardsIn(container: Element): List<SeriesRef> {
+        val out = mutableListOf<SeriesRef>()
+        val seen = mutableSetOf<String>()
+        container.select("a[href*=title_no]").forEach { a ->
+            val href = a.attr("href")
+            if (!href.contains("title_no=")) return@forEach
+            val titleNo = href.substringAfter("title_no=", "").substringBefore("&")
+            if (titleNo.isBlank() || !seen.add(titleNo)) return@forEach
+            val img = a.selectFirst("img") ?: return@forEach
+            val src = img.attr("src").ifBlank { img.attr("data-src") }
+            if (src.isBlank()) return@forEach
+            val title = a.selectFirst("strong.title")?.text()?.trim() ?: return@forEach
+            val author = a.selectFirst("div.author")?.text()?.trim()?.ifBlank { null }
+            val genre = a.selectFirst("div.genre")?.text()?.trim()?.ifBlank { null }
+            out += SeriesRef(
+                url = href,
+                title = title,
+                coverUrl = absCdn(src),
+                author = author,
+                genre = genre,
+            )
+        }
+        return out
+    }
+
+    private val discoveryLanguages = setOf("de", "en", "es", "fr", "id", "th")
+
+    /** Idioma de descubrimiento (búsqueda y recomendaciones) basado en el del dispositivo. */
+    private fun discoveryLang(): String {
+        val lang = Locale.getDefault().language.lowercase()
+        return when {
+            lang == "zh" -> "zh-hant"
+            lang in discoveryLanguages -> lang
+            else -> "en"
         }
     }
 

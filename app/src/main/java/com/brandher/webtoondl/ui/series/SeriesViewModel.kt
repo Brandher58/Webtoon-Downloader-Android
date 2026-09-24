@@ -39,7 +39,7 @@ sealed interface SeriesUiState {
 
 @HiltViewModel
 class SeriesViewModel @Inject constructor(
-    seriesRepository: SeriesRepository,
+    private val seriesRepository: SeriesRepository,
     private val downloadRepository: DownloadRepository,
     private val exporter: LibraryExporter,
     savedStateHandle: SavedStateHandle,
@@ -157,6 +157,21 @@ class SeriesViewModel @Inject constructor(
     fun deleteSeries() {
         downloadRepository.deleteSeries(seriesId)
     }
+
+    fun retryChapters() {
+        viewModelScope.launch {
+            _notice.value = "Buscando capítulos…"
+            _notice.value = try {
+                val n = seriesRepository.syncChapters(seriesId)
+                if (n > 0) "Capítulos cargados: $n" else noChaptersMessage()
+            } catch (e: Exception) {
+                e.message ?: "No se pudieron cargar los capítulos"
+            }
+        }
+    }
+
+    private fun noChaptersMessage() =
+        "No se pudieron cargar los capítulos. Puede ser un límite temporal del servidor; inténtalo en unos segundos."
 
     private var lastEnqueueMs = 0L
 

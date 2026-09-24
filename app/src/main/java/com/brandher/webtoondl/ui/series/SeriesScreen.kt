@@ -127,11 +127,23 @@ fun SeriesScreen(
 
                     if (loaded.items.isEmpty()) {
                         item {
-                            Text(
-                                "No se pudieron cargar los capítulos.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    "No se pudieron cargar los capítulos. Es posible que el servidor " +
+                                        "esté limitando las peticiones.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                OutlinedButton(onClick = { viewModel.retryChapters() }) {
+                                    Text("Reintentar")
+                                }
+                            }
                         }
                     } else {
                         items(loaded.items, key = { it.chapter.id }) { item ->

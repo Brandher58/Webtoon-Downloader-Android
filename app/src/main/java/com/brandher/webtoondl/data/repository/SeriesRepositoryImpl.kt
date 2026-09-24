@@ -91,6 +91,36 @@ class SeriesRepositoryImpl @Inject constructor(
     override suspend fun getSeries(seriesId: String): Series? =
         seriesDao.getById(seriesId)?.toDomain()
 
+    /** Vuelve a buscar los capítulos de la serie desde la fuente (conserva estados de descarga). Devuelve el número. */
+    override suspend fun syncChapters(seriesId: String): Int {
+        val series = seriesDao.getById(seriesId)?.toDomain() ?: return 0
+        val source = sourceRegistry.match(series.url)
+        val chapters = source.fetchChapters(series)
+        if (chapters.isEmpty()) return 0
+        val fetched = chapters.map { it.toEntity() }
+        val existing = chapterDao.getByIds(fetched.map { it.id }).associateBy { it.id }
+        val merged = fetched.map { fresh ->
+            val old = existing[fresh.id]
+            if (old == null) {
+                fresh
+            } else {
+                fresh.copy(
+                    queueStatus = old.queueStatus,
+                    pagesTotal = old.pagesTotal,
+                    pagesDone = old.pagesDone,
+                    outputFormat = old.outputFormat,
+                    error = old.error,
+                )
+            }
+        }
+        val fetchedIds = fetched.map { it.id }.toSet()
+        val staleIds = chapterDao.getForSeries(seriesId)
+            .filter { it.id !in fetchedIds && it.queueStatus == "NONE" }
+            .map { it.id }
+        seriesDao.syncSeries(series.toEntity(), merged, staleIds)
+        return chapters.size
+    }
+
     override suspend fun addByUrl(url: String): String {
         val source = sourceRegistry.match(url)
         val series = source.fetchSeries(url)

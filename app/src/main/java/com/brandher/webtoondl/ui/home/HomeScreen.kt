@@ -68,6 +68,7 @@ fun HomeScreen(
     LaunchedEffect(addUrlState) {
         if (addUrlState is AddUrlState.Success) {
             val seriesId = (addUrlState as AddUrlState.Success).seriesId
+            url = ""
             viewModel.consumeAddResult()
             onOpenSeries(seriesId)
         }

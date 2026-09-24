@@ -6,6 +6,7 @@ import com.brandher.webtoondl.data.db.dao.SeriesDao
 import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.ReadingPositionEntity
 import com.brandher.webtoondl.data.db.SeriesEntity
+import com.brandher.webtoondl.data.db.SqlBatch
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
@@ -133,7 +134,9 @@ class SeriesRepositoryImpl @Inject constructor(
     /** Inserta/actualiza capítulos conservando el estado de descarga de los ya existentes. */
     private suspend fun persistChapters(chapters: List<ChapterEntity>) {
         if (chapters.isEmpty()) return
-        val existing = chapterDao.getByIds(chapters.map { it.id }).associateBy { it.id }
+        val existing = idBatches(chapters.map { it.id })
+            .flatMap { chapterDao.getByIds(it) }
+            .associateBy { it.id }
         val merged = chapters.map { fresh ->
             val old = existing[fresh.id]
             if (old == null) {
@@ -148,8 +151,11 @@ class SeriesRepositoryImpl @Inject constructor(
                 )
             }
         }
-        chapterDao.upsertAll(merged)
+        merged.chunked(SqlBatch.SIZE).forEach { chapterDao.upsertAll(it) }
     }
+
+    /** Divide una lista de ids en lotes para no superar el límite de variables de SQLite. */
+    private fun idBatches(ids: List<String>): List<List<String>> = ids.chunked(SqlBatch.SIZE)
 
     override suspend fun deleteSeries(seriesId: String) {
         seriesDao.deleteById(seriesId)

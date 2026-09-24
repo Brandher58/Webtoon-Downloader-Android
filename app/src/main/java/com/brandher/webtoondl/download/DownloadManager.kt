@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.brandher.webtoondl.data.db.ChapterEntity
+import com.brandher.webtoondl.data.db.SqlBatch
 import com.brandher.webtoondl.data.db.dao.ChapterDao
 import com.brandher.webtoondl.data.db.dao.PageDao
 import com.brandher.webtoondl.data.db.dao.SeriesDao
@@ -94,7 +95,8 @@ class DownloadManager @Inject constructor(
     override fun enqueue(chapterIds: List<String>) {
         if (chapterIds.isEmpty()) return
         scope.launch {
-            val chapters = chapterDao.getByIds(chapterIds)
+            // Lotes para respetar el límite de variables de SQLite en `IN`.
+            val chapters = chapterIds.chunked(SqlBatch.SIZE).flatMap { chapterDao.getByIds(it) }
             var queued = 0
             chapters.forEach { entity ->
                 if (entity.queueStatus != QueueStatus.COMPLETED.name) {

@@ -50,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import java.io.File
@@ -66,6 +69,28 @@ fun ReaderScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val activity = LocalContext.current.findActivity()
     var anyZoomed by remember { mutableStateOf(false) }
+
+    // Última posición conocida: se guarda inmediatamente al salir del lector.
+    var latestPosition by remember { mutableStateOf(0 to 0f) }
+    var positionReady by remember { mutableStateOf(false) }
+
+    val savePosition = {
+        if (positionReady) {
+            viewModel.savePosition(latestPosition.first, latestPosition.second)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(Unit) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) savePosition()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            savePosition()
+        }
+    }
 
     DisposableEffect(Unit) {
         val controller = activity?.window?.let {
@@ -101,11 +126,29 @@ fun ReaderScreen(
                 LaunchedEffect(state.savedPageIndex, state.files.size) {
                     if (!restored && state.files.isNotEmpty()) {
                         val index = state.savedPageIndex.coerceIn(0, state.files.lastIndex)
+                        latestPosition = index to 0f
+                        positionReady = true
                         if (index > 0) listState.scrollToItem(index)
                         restored = true
                     }
                 }
 
+                // Registra la última posición sin debounce (para guardarla al salir).
+                LaunchedEffect(listState) {
+                    snapshotFlow {
+                        val info = listState.layoutInfo
+                        val first = info.visibleItemsInfo.firstOrNull()
+                        Triple(info.totalItemsCount, first?.index ?: 0, first?.offset ?: 0)
+                    }.collect { (total, index, offset) ->
+                        val lastIndex = state.files.lastIndex
+                        if (lastIndex == -1 || (index <= lastIndex && !anyZoomed)) {
+                            latestPosition = index.coerceAtLeast(0) to offset.toFloat()
+                            positionReady = true
+                        }
+                    }
+                }
+
+                // Guardado periódico (debounced) para no escribir en cada frame.
                 LaunchedEffect(listState) {
                     snapshotFlow {
                         val info = listState.layoutInfo

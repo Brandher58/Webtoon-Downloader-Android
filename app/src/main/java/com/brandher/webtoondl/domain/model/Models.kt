@@ -34,8 +34,38 @@ data class PageRef(
     val url: String,
 )
 
+/** Formato de salida elegido al descargar un capítulo. */
+enum class OutputFormat {
+    IMAGES,
+    CBZ,
+    PDF;
+
+    companion object {
+        fun from(name: String): OutputFormat = entries.firstOrNull { it.name == name } ?: IMAGES
+    }
+}
+
+/** Capítulo junto con su estado de descarga, para la UI. */
+data class ChapterItem(
+    val chapter: Chapter,
+    val status: QueueStatus,
+    val pagesTotal: Int?,
+    val pagesDone: Int,
+)
+
+/** Elemento de la cola de descargas, con el título de la serie. */
+data class QueueItem(
+    val chapter: Chapter,
+    val seriesTitle: String,
+    val status: QueueStatus,
+    val pagesTotal: Int?,
+    val pagesDone: Int,
+)
+
 /** Estados de la cola de descargas para un capítulo. */
 enum class QueueStatus {
+    /** Estado por defecto: aún no se ha encolado para descargar. */
+    NONE,
     QUEUED,
     DOWNLOADING,
     PAUSED,
@@ -47,7 +77,7 @@ enum class QueueStatus {
         get() = this == QUEUED || this == DOWNLOADING
 
     companion object {
-        fun from(name: String): QueueStatus = entries.firstOrNull { it.name == name } ?: QUEUED
+        fun from(name: String): QueueStatus = entries.firstOrNull { it.name == name } ?: NONE
     }
 }
 

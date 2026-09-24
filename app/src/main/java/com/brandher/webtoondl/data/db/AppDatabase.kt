@@ -14,7 +14,7 @@ import com.brandher.webtoondl.data.db.dao.SeriesDao
         PageEntity::class,
         ReadingPositionEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

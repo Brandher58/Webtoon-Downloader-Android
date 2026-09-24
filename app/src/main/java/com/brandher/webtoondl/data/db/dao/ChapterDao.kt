@@ -20,6 +20,27 @@ interface ChapterDao {
     @Query("UPDATE chapters SET queue_status = :status WHERE id = :chapterId")
     suspend fun updateStatus(chapterId: String, status: String)
 
+    @Query("UPDATE chapters SET queue_status = :status, error = :error WHERE id = :chapterId")
+    suspend fun updateStatusError(chapterId: String, status: String, error: String?)
+
+    @Query("UPDATE chapters SET queue_status = :status, error = NULL, output_format = :format WHERE id = :chapterId")
+    suspend fun configureEnqueue(chapterId: String, format: String, status: String)
+
+    @Query("UPDATE chapters SET queue_status = :to, error = NULL WHERE queue_status IN (:fromStatuses)")
+    suspend fun updateStatuses(fromStatuses: List<String>, to: String)
+
+    @Query("UPDATE chapters SET queue_status = :status WHERE series_id = :seriesId")
+    suspend fun updateStatusForSeries(seriesId: String, status: String)
+
+    @Query("UPDATE chapters SET pages_total = :total, pages_done = :done WHERE id = :chapterId")
+    suspend fun updateProgress(chapterId: String, total: Int, done: Int)
+
+    @Query("SELECT * FROM chapters WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<ChapterEntity>
+
+    @Query("SELECT * FROM chapters WHERE queue_status IN (:statuses)")
+    suspend fun getByStatuses(statuses: List<String>): List<ChapterEntity>
+
     @Query("DELETE FROM chapters WHERE series_id = :seriesId")
     suspend fun deleteForSeries(seriesId: String)
 
@@ -47,4 +68,13 @@ interface ChapterDao {
            ORDER BY c.number ASC""",
     )
     fun observeBySeriesAndStatuses(seriesId: String, statuses: List<String>): Flow<List<ChapterEntity>>
+
+    @Query(
+        """SELECT c.*, s.title AS seriesTitle
+           FROM chapters c
+           JOIN series s ON s.id = c.series_id
+           WHERE c.queue_status IN (:statuses)
+           ORDER BY c.number ASC""",
+    )
+    fun observeQueue(statuses: List<String>): Flow<List<ChapterQueueRow>>
 }

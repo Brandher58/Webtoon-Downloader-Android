@@ -5,7 +5,8 @@ import com.brandher.webtoondl.data.db.dao.SeriesDao
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
-import com.brandher.webtoondl.domain.model.Chapter
+import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.repo.SeriesRepository
 import javax.inject.Inject
@@ -23,9 +24,17 @@ class SeriesRepositoryImpl @Inject constructor(
     override fun observeSeries(seriesId: String): Flow<Series?> =
         seriesDao.observeById(seriesId).map { it?.toDomain() }
 
-    override fun observeChapters(seriesId: String): Flow<List<Chapter>> =
-        chapterDao.observeForSeries(seriesId)
-            .map { list -> list.map { it.toDomain() } }
+    override fun observeChapterItems(seriesId: String): Flow<List<ChapterItem>> =
+        chapterDao.observeForSeries(seriesId).map { entities ->
+            entities.map {
+                ChapterItem(
+                    chapter = it.toDomain(),
+                    status = QueueStatus.from(it.queueStatus),
+                    pagesTotal = it.pagesTotal,
+                    pagesDone = it.pagesDone,
+                )
+            }
+        }
 
     override fun observeRecentSeries(limit: Int): Flow<List<Series>> =
         seriesDao.observeRecent(limit).map { list -> list.map { it.toDomain() } }

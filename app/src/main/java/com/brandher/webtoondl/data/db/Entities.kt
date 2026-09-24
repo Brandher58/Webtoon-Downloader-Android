@@ -55,6 +55,7 @@ data class ChapterEntity(
     @ColumnInfo(name = "queue_status") val queueStatus: String,
     @ColumnInfo(name = "pages_total") val pagesTotal: Int?,
     @ColumnInfo(name = "pages_done") val pagesDone: Int,
+    @ColumnInfo(name = "output_format") val outputFormat: String = "IMAGES",
     val error: String?,
 )
 

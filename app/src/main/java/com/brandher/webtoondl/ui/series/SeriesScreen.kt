@@ -10,25 +10,40 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.brandher.webtoondl.domain.model.Chapter
+import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.OutputFormat
+import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
 import java.text.DateFormat
 import java.util.Date
@@ -74,24 +89,27 @@ fun SeriesScreen(
             }
 
             is SeriesUiState.Loaded -> {
+                val loaded = s
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .imePadding(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item { SeriesHeader(s.series) }
+                    item { SeriesHeader(loaded.series) }
+                    item { DownloadPanel(vm = viewModel, state = loaded) }
 
                     item {
                         Text(
-                            text = "Capítulos (${s.chapters.size})",
+                            text = "Capítulos (${loaded.totalChapters})",
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                         )
                     }
 
-                    if (s.chapters.isEmpty()) {
+                    if (loaded.items.isEmpty()) {
                         item {
                             Text(
                                 "No se pudieron cargar los capítulos.",
@@ -100,10 +118,120 @@ fun SeriesScreen(
                             )
                         }
                     } else {
-                        items(s.chapters, key = { it.id }) { chapter ->
-                            ChapterRow(chapter = chapter)
+                        items(loaded.items, key = { it.chapter.id }) { item ->
+                            ChapterRow(
+                                item = item,
+                                selected = item.chapter.id in loaded.selected,
+                                onToggle = { viewModel.toggleChapter(item.chapter.id) },
+                            )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
+    var fromText by rememberSaveable { mutableStateOf("") }
+    var toText by rememberSaveable { mutableStateOf("") }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Descargar", style = MaterialTheme.typography.titleSmall)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutputFormat.entries.forEach { fmt ->
+                    FilterChip(
+                        selected = state.format == fmt,
+                        onClick = { vm.setFormat(fmt) },
+                        label = {
+                            Text(
+                                when (fmt) {
+                                    OutputFormat.IMAGES -> "Imágenes"
+                                    OutputFormat.CBZ -> "CBZ"
+                                    OutputFormat.PDF -> "PDF"
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = fromText,
+                    onValueChange = { fromText = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Desde") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = toText,
+                    onValueChange = { toText = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Hasta") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = {
+                        val from = fromText.toIntOrNull()
+                        val to = toText.toIntOrNull()
+                        if (from != null && to != null) vm.downloadRange(from, to)
+                    },
+                    enabled = fromText.isNotBlank() && toText.isNotBlank(),
+                ) {
+                    Text("Rango")
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val allSelected = state.totalChapters > 0 && state.selectedCount == state.totalChapters
+                OutlinedButton(
+                    onClick = { vm.toggleSelectAll() },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (allSelected) "Quitar selección" else "Seleccionar todo")
+                }
+                Button(
+                    onClick = { vm.downloadAll() },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Descargar todo")
+                }
+            }
+
+            Button(
+                onClick = { vm.downloadSelected() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.selectedCount > 0,
+            ) {
+                Text("Descargar selección (${state.selectedCount})")
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = vm::pauseAll) {
+                    Icon(Icons.Filled.PauseCircle, contentDescription = null)
+                    Text("Pausar", modifier = Modifier.padding(start = 4.dp))
+                }
+                OutlinedButton(onClick = vm::resumeAll) {
+                    Text("Reanudar")
                 }
             }
         }
@@ -122,10 +250,7 @@ private fun SeriesHeader(series: Series) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = series.title,
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            Text(text = series.title, style = MaterialTheme.typography.headlineSmall)
             val meta = listOfNotNull(series.author, series.genre).joinToString(" · ")
             if (meta.isNotBlank()) {
                 Text(
@@ -146,26 +271,41 @@ private fun SeriesHeader(series: Series) {
 }
 
 @Composable
-private fun ChapterRow(chapter: Chapter) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun ChapterRow(
+    item: ChapterItem,
+    selected: Boolean,
+    onToggle: () -> Unit,
+) {
+    Card(
+        onClick = onToggle,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        ),
+    ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Checkbox(checked = selected, onCheckedChange = { onToggle() })
             Text(
-                text = chapter.number.toString(),
+                text = item.chapter.number.toString(),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(end = 12.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = chapter.title.ifBlank { "Capítulo ${chapter.number}" },
+                    text = item.chapter.title.ifBlank { "Capítulo ${item.chapter.number}" },
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                chapter.date?.let {
+                item.chapter.date?.let {
                     Text(
                         text = DateFormat.getDateInstance().format(Date(it)),
                         style = MaterialTheme.typography.bodySmall,
@@ -173,6 +313,45 @@ private fun ChapterRow(chapter: Chapter) {
                     )
                 }
             }
+            StatusBadge(item)
         }
     }
+}
+
+@Composable
+private fun StatusBadge(item: ChapterItem) {
+    when (item.status) {
+        QueueStatus.NONE -> Unit
+        QueueStatus.COMPLETED -> AssistChip(
+            onClick = {},
+            label = { Text(item.pagesTotal?.let { "✓ $it" } ?: "✓") },
+            leadingIcon = { Icon(Icons.Filled.Check, contentDescription = "Descargado") },
+        )
+
+        QueueStatus.DOWNLOADING -> AssistChip(
+            onClick = {},
+            label = { Text(item.progressText()) },
+            leadingIcon = {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(end = 4.dp),
+                    strokeWidth = 2.dp,
+                )
+            },
+        )
+
+        QueueStatus.QUEUED -> AssistChip(onClick = {}, label = { Text("En cola") })
+        QueueStatus.PAUSED -> AssistChip(onClick = {}, label = { Text(item.progressText()) })
+        QueueStatus.FAILED -> AssistChip(
+            onClick = {},
+            label = { Text(item.progressText()) },
+            leadingIcon = { Icon(Icons.Filled.ErrorOutline, contentDescription = "Error") },
+        )
+
+        QueueStatus.CANCELLED -> Unit
+    }
+}
+
+private fun ChapterItem.progressText(): String {
+    val total = pagesTotal ?: return "…"
+    return if (pagesDone >= total) "$total" else "$pagesDone/$total"
 }

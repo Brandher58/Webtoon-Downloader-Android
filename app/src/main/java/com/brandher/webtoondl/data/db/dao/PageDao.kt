@@ -31,4 +31,7 @@ interface PageDao {
 
     @Query("DELETE FROM pages WHERE chapter_id = :chapterId")
     suspend fun deleteForChapter(chapterId: String)
+
+    @Query("UPDATE pages SET status = :status WHERE id = :pageId")
+    suspend fun updateStatus(pageId: String, status: String)
 }

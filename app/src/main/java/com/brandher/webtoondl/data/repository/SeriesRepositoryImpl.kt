@@ -3,6 +3,7 @@ package com.brandher.webtoondl.data.repository
 import com.brandher.webtoondl.data.db.dao.ChapterDao
 import com.brandher.webtoondl.data.db.dao.ReadingPositionDao
 import com.brandher.webtoondl.data.db.dao.SeriesDao
+import com.brandher.webtoondl.data.db.ChapterEntity
 import com.brandher.webtoondl.data.db.ReadingPositionEntity
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
@@ -91,30 +92,15 @@ class SeriesRepositoryImpl @Inject constructor(
     override suspend fun getSeries(seriesId: String): Series? =
         seriesDao.getById(seriesId)?.toDomain()
 
-    /** Vuelve a buscar los capítulos de la serie desde la fuente (conserva estados de descarga). Devuelve el número. */
+    /** Vuelve a buscar los capítulos de la serie desde la fuente. Inserta nuevos y actualiza metadatos
+     *  sin tocar el estado de descarga ni las páginas ya existentes. Devuelve el número de capítulos. */
     override suspend fun syncChapters(seriesId: String): Int {
         val series = seriesDao.getById(seriesId)?.toDomain() ?: return 0
         val source = sourceRegistry.match(series.url)
         val chapters = source.fetchChapters(series)
         if (chapters.isEmpty()) return 0
-        val fetched = chapters.map { it.toEntity() }
-        val existing = chapterDao.getByIds(fetched.map { it.id }).associateBy { it.id }
-        val merged = fetched.map { fresh ->
-            val old = existing[fresh.id]
-            if (old == null) {
-                fresh
-            } else {
-                fresh.copy(
-                    queueStatus = old.queueStatus,
-                    pagesTotal = old.pagesTotal,
-                    pagesDone = old.pagesDone,
-                    outputFormat = old.outputFormat,
-                    error = old.error,
-                )
-            }
-        }
         seriesDao.upsert(series.toEntity())
-        chapterDao.upsertAll(merged)
+        persistChapters(chapters.map { it.toEntity() })
         return chapters.size
     }
 
@@ -126,27 +112,18 @@ class SeriesRepositoryImpl @Inject constructor(
         // Una respuesta sin capítulos no debe crear una serie "fantasma": se avisa al usuario y no se guarda.
         if (chapters.isEmpty()) throw NoChaptersFoundException(series.title)
 
-        // Re-sincronización conservando el estado de descarga de capítulos ya existentes (escritura atómica).
-        val fetched = chapters.map { it.toEntity() }
-        val existing = chapterDao.getByIds(fetched.map { it.id }).associateBy { it.id }
-        val merged = fetched.map { fresh ->
-            val old = existing[fresh.id]
-            if (old == null) {
-                fresh
-            } else {
-                fresh.copy(
-                    queueStatus = old.queueStatus,
-                    pagesTotal = old.pagesTotal,
-                    pagesDone = old.pagesDone,
-                    outputFormat = old.outputFormat,
-                    error = old.error,
-                )
-            }
-        }
-
         seriesDao.upsert(series.toEntity())
-        chapterDao.upsertAll(merged)
+        persistChapters(chapters.map { it.toEntity() })
         return series.id
+    }
+
+    /** Solo inserta capítulos nuevos y refresca metadatos; nunca sobrescribe estados de descarga. */
+    private suspend fun persistChapters(chapters: List<ChapterEntity>) {
+        if (chapters.isEmpty()) return
+        chapterDao.insertNewChapters(chapters)
+        chapters.forEach { c ->
+            chapterDao.updateMetadata(c.id, c.title, c.number, c.viewerUrl, c.thumbUrl, c.date)
+        }
     }
 
     override suspend fun deleteSeries(seriesId: String) {

@@ -100,19 +100,20 @@ class WebtoonSource @Inject constructor(
             if (lang != null) append("&readingLanguageCode=$lang")
         }
 
-        // Consume la API de episodios; si devuelve lista vacía (límite temporal), reintenta con backoff.
+        // Consume la API de episodios. Reintenta si viene vacía o recortada (algunos nodos devuelven
+        // solo el tramo final, p. ej. 27..264 en vez de 1..264).
         val response = fetchEpisodesWithRetry(apiUrl)
 
         return response.result.episodeList
             // Orden determinista ascendente aunque la API lo devuelva en otro orden.
             .sortedBy { it.episodeNo }
-            .mapIndexed { index, episode ->
+            .map { episode ->
             Chapter(
                 id = "${series.id}:${episode.episodeNo}",
                 seriesId = series.id,
                 sourceId = id,
                 episodeNo = episode.episodeNo,
-                number = index + 1,
+                number = episode.episodeNo.toInt(),
                 title = episode.episodeTitle.trim(),
                 viewerUrl = WEBTOONS_HOST + episode.viewerLink,
                 thumbUrl = absCdn(episode.thumbnail),
@@ -226,12 +227,19 @@ class WebtoonSource @Inject constructor(
     private suspend fun fetchEpisodesWithRetry(apiUrl: String): EpisodesResponse {
         var response = json.decodeFromString(EpisodesResponse.serializer(), get(apiUrl, mobile = true))
         var attempt = 1
-        while (response.result.episodeList.isEmpty() && attempt < MAX_EPISODES_ATTEMPTS) {
+        while (needsRetry(response) && attempt < MAX_EPISODES_ATTEMPTS) {
             delay(1_000L * attempt)
             response = json.decodeFromString(EpisodesResponse.serializer(), get(apiUrl, mobile = true))
             attempt++
         }
         return response
+    }
+
+    /** Reintenta si la lista vino vacía o recortada (no empieza en el capítulo 1). */
+    private fun needsRetry(response: EpisodesResponse): Boolean {
+        val list = response.result.episodeList
+        if (list.isEmpty()) return true
+        return list.minOf { it.episodeNo } > 1
     }
 
     private suspend fun get(url: String, mobile: Boolean): String = withContext(Dispatchers.IO) {

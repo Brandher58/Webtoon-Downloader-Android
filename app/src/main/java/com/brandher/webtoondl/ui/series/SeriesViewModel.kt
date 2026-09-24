@@ -78,12 +78,17 @@ class SeriesViewModel @Inject constructor(
     private var autoRetried = false
 
     init {
-        // Auto-reparación: si la serie quedó sin capítulos (fallo transitorio anterior), reintenta una vez al abrir.
+        // Auto-reparación: si la serie quedó sin capítulos o con una lista recortada (no empieza en 1),
+        // vuelve a sincronizar una vez al abrir.
         viewModelScope.launch {
             val state = uiState.first { it is SeriesUiState.Loaded }
-            if (state is SeriesUiState.Loaded && state.items.isEmpty() && !autoRetried) {
-                autoRetried = true
-                retryChapters()
+            if (state is SeriesUiState.Loaded && !autoRetried) {
+                val items = state.items
+                val truncated = items.isNotEmpty() && items.minOf { it.chapter.number } > 1
+                if ((items.isEmpty() || truncated) && !autoRetried) {
+                    autoRetried = true
+                    retryChapters()
+                }
             }
         }
     }

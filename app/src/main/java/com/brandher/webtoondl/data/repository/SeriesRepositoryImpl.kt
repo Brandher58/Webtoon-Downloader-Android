@@ -113,11 +113,8 @@ class SeriesRepositoryImpl @Inject constructor(
                 )
             }
         }
-        val fetchedIds = fetched.map { it.id }.toSet()
-        val staleIds = chapterDao.getForSeries(seriesId)
-            .filter { it.id !in fetchedIds && it.queueStatus == "NONE" }
-            .map { it.id }
-        seriesDao.syncSeries(series.toEntity(), merged, staleIds)
+        seriesDao.upsert(series.toEntity())
+        chapterDao.upsertAll(merged)
         return chapters.size
     }
 
@@ -147,13 +144,8 @@ class SeriesRepositoryImpl @Inject constructor(
             }
         }
 
-        // Capítulos que ya no existen en la fuente, SOLO si no están descargados/encolados.
-        val fetchedIds = fetched.map { it.id }.toSet()
-        val staleIds = chapterDao.getForSeries(series.id)
-            .filter { it.id !in fetchedIds && it.queueStatus == "NONE" }
-            .map { it.id }
-
-        seriesDao.syncSeries(series.toEntity(), merged, staleIds)
+        seriesDao.upsert(series.toEntity())
+        chapterDao.upsertAll(merged)
         return series.id
     }
 

@@ -69,7 +69,10 @@ fun WebtoonDLApp() {
                 HomeScreen(onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) })
             }
             composable(Destination.Library.route) {
-                LibraryScreen(onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) })
+                LibraryScreen(
+                    onOpenSeries = { seriesId -> navController.navigate(Routes.series(seriesId)) },
+                    onOpenReader = { chapterId -> navController.navigate(Routes.reader(chapterId)) },
+                )
             }
             composable(Destination.Downloads.route) { DownloadsScreen() }
             composable(Destination.Settings.route) { SettingsScreen() }

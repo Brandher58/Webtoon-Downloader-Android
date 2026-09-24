@@ -77,6 +77,13 @@ data class ReadingPosition(
     val updatedAt: Long,
 )
 
+/** Última posición de lectura de una serie (para "Continuar leyendo"). */
+data class LastReadInfo(
+    val seriesId: String,
+    val chapterId: String,
+    val downloaded: Boolean,
+)
+
 /** Estados de la cola de descargas para un capítulo. */
 enum class QueueStatus {
     /** Estado por defecto: aún no se ha encolado para descargar. */

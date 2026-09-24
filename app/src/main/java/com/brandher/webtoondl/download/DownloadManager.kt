@@ -81,6 +81,10 @@ class DownloadManager @Inject constructor(
 
     init {
         scope.launch {
+            // Auto-reanudación: si la app se cerró con capítulos "descargando", se vuelven a encolar.
+            chapterDao.updateStatuses(listOf(QueueStatus.DOWNLOADING.name), QueueStatus.QUEUED.name)
+        }
+        scope.launch {
             activeFlow.collect { active ->
                 if (active) startForegroundService() else stopForegroundService()
             }

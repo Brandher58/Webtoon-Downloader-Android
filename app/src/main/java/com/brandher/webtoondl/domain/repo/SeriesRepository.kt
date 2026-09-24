@@ -2,6 +2,7 @@ package com.brandher.webtoondl.domain.repo
 
 import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.LastReadInfo
 import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesStats
@@ -19,6 +20,9 @@ interface SeriesRepository {
     fun observeReadingPosition(chapterId: String): Flow<ReadingPosition?>
 
     suspend fun saveReadingPosition(chapterId: String, pageIndex: Int, offsetPx: Float)
+
+    /** Última posición leída de cada serie (para "Continuar leyendo"). */
+    fun observeLastReadAll(): Flow<List<LastReadInfo>>
 
     fun observeRecentSeries(limit: Int): Flow<List<Series>>
 

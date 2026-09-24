@@ -9,6 +9,7 @@ import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
 import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
+import com.brandher.webtoondl.domain.model.LastReadInfo
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.ReadingPosition
 import com.brandher.webtoondl.domain.model.Series
@@ -46,6 +47,17 @@ class SeriesRepositoryImpl @Inject constructor(
             ),
         )
     }
+
+    override fun observeLastReadAll(): Flow<List<LastReadInfo>> =
+        readingPositionDao.observeLastReadAll().map { rows ->
+            rows.map {
+                LastReadInfo(
+                    seriesId = it.seriesId,
+                    chapterId = it.chapterId,
+                    downloaded = it.downloaded,
+                )
+            }
+        }
 
     override fun observeChapterItems(seriesId: String): Flow<List<ChapterItem>> =
         chapterDao.observeForSeries(seriesId).map { entities ->

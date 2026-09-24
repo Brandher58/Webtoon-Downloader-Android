@@ -1,5 +1,9 @@
 package com.brandher.webtoondl.ui.library
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,29 +17,64 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.brandher.webtoondl.domain.model.SeriesStats
+import kotlinx.coroutines.delay
 
 @Composable
 fun LibraryScreen(
     onOpenSeries: (String) -> Unit,
+    onOpenReader: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val exportingId by viewModel.exporting.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var pendingExport by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            } catch (_: Exception) {
+                // Algunos proveedores no lo permiten; la copia funciona igualmente con el permiso temporal.
+            }
+            pendingExport?.let { pending ->
+                viewModel.exportSeries(pending, uri)
+                pendingExport = null
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -47,7 +86,7 @@ fun LibraryScreen(
             Text("Biblioteca", style = MaterialTheme.typography.headlineSmall)
         }
 
-        if (state.series.isEmpty()) {
+        if (state.items.isEmpty()) {
             item {
                 Column(
                     modifier = Modifier
@@ -67,15 +106,59 @@ fun LibraryScreen(
                 }
             }
         } else {
-            items(state.series, key = { it.series.id }) { item ->
-                LibraryRow(item = item, onOpen = { onOpenSeries(item.series.id) })
+            items(state.items, key = { it.stats.series.id }) { item ->
+                LibraryRow(
+                    item = item,
+                    exporting = exportingId == item.stats.series.id,
+                    onOpen = { onOpenSeries(item.stats.series.id) },
+                    onContinue = item.lastReadChapterId?.let { chapterId ->
+                        { onOpenReader(chapterId) }
+                    },
+                    onExport = {
+                        pendingExport = item.stats.series.id
+                        exportLauncher.launch(null)
+                    },
+                )
+            }
+        }
+    }
+
+    when {
+        message != null -> {
+            val text = message
+            LaunchedEffect(text) {
+                delay(3_000)
+                viewModel.consumeMessage()
+            }
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Text(
+                    text = text.orEmpty(),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            MaterialTheme.shapes.medium,
+                        )
+                        .padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LibraryRow(item: SeriesStats, onOpen: () -> Unit) {
+private fun LibraryRow(
+    item: LibraryItem,
+    exporting: Boolean,
+    onOpen: () -> Unit,
+    onContinue: (() -> Unit)?,
+    onExport: () -> Unit,
+) {
+    val stats: SeriesStats = item.stats
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -87,11 +170,15 @@ private fun LibraryRow(item: SeriesStats, onOpen: () -> Unit) {
                     .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                if (exporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
 
             Column(
@@ -101,22 +188,21 @@ private fun LibraryRow(item: SeriesStats, onOpen: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = item.series.title,
+                    text = stats.series.title,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val meta = listOfNotNull(item.series.author).joinToString(" · ")
-                if (meta.isNotBlank()) {
+                stats.series.author?.takeIf { it.isNotBlank() }?.let {
                     Text(
-                        text = meta,
+                        text = it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                val progress = if (item.totalChapters > 0) {
-                    (item.downloadedChapters / item.totalChapters.toFloat()).coerceIn(0f, 1f)
+                val progress = if (stats.totalChapters > 0) {
+                    (stats.downloadedChapters / stats.totalChapters.toFloat()).coerceIn(0f, 1f)
                 } else {
                     0f
                 }
@@ -125,14 +211,28 @@ private fun LibraryRow(item: SeriesStats, onOpen: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "Descargados: ${item.downloadedChapters}/${item.totalChapters}",
+                    text = "Descargados: ${stats.downloadedChapters}/${stats.totalChapters}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            Button(onClick = onOpen) {
-                Text("Abrir")
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                if (onContinue != null) {
+                    Button(onClick = onContinue) {
+                        Text("Continuar")
+                    }
+                } else {
+                    OutlinedButton(onClick = onOpen) {
+                        Text("Abrir")
+                    }
+                }
+                IconButton(onClick = onExport, enabled = !exporting) {
+                    Icon(Icons.Filled.Share, contentDescription = "Exportar")
+                }
             }
         }
     }

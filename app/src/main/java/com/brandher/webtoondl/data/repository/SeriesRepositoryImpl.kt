@@ -121,16 +121,27 @@ class SeriesRepositoryImpl @Inject constructor(
 
     /** Audita el disco (sin red): los capítulos marcados NONE que ya tienen archivos pasan a COMPLETED. */
     override suspend fun reconcileDownloads(seriesId: String) {
-        val chapters = chapterDao.getForSeries(seriesId)
-        for (chapter in chapters) {
-            if (QueueStatus.from(chapter.queueStatus) == QueueStatus.NONE) {
-                val files = storage.chapterFiles(chapter)
-                if (files.isNotEmpty()) {
-                    chapterDao.updateStatus(chapter.id, QueueStatus.COMPLETED.name)
-                    chapterDao.updateProgress(chapter.id, files.size, files.size)
-                }
+        chapterDao.getForSeries(seriesId).forEach { reconcileChapter(it) }
+    }
+
+    override suspend fun reconcileAllDownloads(): Int {
+        var changed = 0
+        seriesDao.getAll().forEach { series ->
+            chapterDao.getForSeries(series.id).forEach { chapter ->
+                if (reconcileChapter(chapter)) changed++
             }
         }
+        return changed
+    }
+
+    /** @return true si el capítulo cambió de NONE a COMPLETED porque ya tenía archivos. */
+    private suspend fun reconcileChapter(chapter: ChapterEntity): Boolean {
+        if (QueueStatus.from(chapter.queueStatus) != QueueStatus.NONE) return false
+        val files = storage.chapterFiles(chapter)
+        if (files.isEmpty()) return false
+        chapterDao.updateStatus(chapter.id, QueueStatus.COMPLETED.name)
+        chapterDao.updateProgress(chapter.id, files.size, files.size)
+        return true
     }
 
     /** Escribe la serie sin borrar: inserta si falta y actualiza metadatos. */

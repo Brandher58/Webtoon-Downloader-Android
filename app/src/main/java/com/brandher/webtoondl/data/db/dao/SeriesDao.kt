@@ -49,6 +49,9 @@ interface SeriesDao {
     @Query("SELECT * FROM series ORDER BY added_at DESC")
     fun observeAll(): Flow<List<SeriesEntity>>
 
+    @Query("SELECT * FROM series")
+    suspend fun getAll(): List<SeriesEntity>
+
     @Query(
         """
         SELECT s.*,

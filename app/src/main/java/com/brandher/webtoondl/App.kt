@@ -7,18 +7,33 @@ import android.os.Build
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.brandher.webtoondl.data.repository.LocalLibraryAuditor
 import com.brandher.webtoondl.download.DownloadService
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 @HiltAndroidApp
 class App : Application() {
 
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface AppEntryPoint {
+        fun localLibraryAuditor(): LocalLibraryAuditor
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         setupCoil()
+        // Detecta automáticamente (sin red) los capítulos ya descargados en disco, al arrancar.
+        EntryPointAccessors.fromApplication(this, AppEntryPoint::class.java)
+            .localLibraryAuditor()
+            .reconcileAllAsync()
     }
 
     /**

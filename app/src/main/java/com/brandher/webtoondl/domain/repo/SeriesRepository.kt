@@ -45,6 +45,9 @@ interface SeriesRepository {
     /** Audita el disco y marca como COMPLETED los capítulos NONE que ya tienen archivos (sin red). */
     suspend fun reconcileDownloads(seriesId: String)
 
+    /** Audita todas las series de una vez (sin red). Devuelve el número de capítulos marcados. */
+    suspend fun reconcileAllDownloads(): Int
+
     /** Agrega una serie a partir de su URL, sincronizando la lista de capítulos. Devuelve el id de la serie. */
     suspend fun addByUrl(url: String): String
 

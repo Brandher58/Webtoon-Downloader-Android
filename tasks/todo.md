@@ -1,22 +1,27 @@
 # Plan — Detección automática de capítulos descargados (sin Internet)
 
 ## Objetivo
-Que al abrir un webtoon, la app detecte **automáticamente** (usando el disco como fuente de verdad,
-sin red) que un capítulo ya está descargado aunque Room diga `NONE`, y lo muestre como `✓ ` listo para leer.
+Detectar automáticamente (disco como fuente de verdad, sin red) los capítulos descargados,
+tanto al abrir una ficha como **sin necesidad de abrirla** (al arrancar y al ver la Biblioteca).
 
 ## Estado
-- [x] `SeriesRepository.reconcileDownloads(seriesId)` (nuevo): audita disco y marca COMPLETED los `NONE` con archivos (sin red).
-- [x] `SeriesRepositoryImpl` inyecta `StorageManager`.
-- [ ] Compilar + tests unitarios.
-- [ ] Instalar en el dispositivo.
-- [ ] Verificar en vivo: crear archivos de un capítulo NONE → abrir la serie OFFLINE → debe marcar `✓ N` automáticamente.
-- [ ] Commit/push.
+- [x] `reconcileDownloads(seriesId)` al abrir la ficha.
+- [x] `reconcileAllDownloads()` global (sin red) lanzado:
+  - al arrancar la app (`LocalLibraryAuditor` + EntryPoint),
+  - al abrir la Biblioteca (`LibraryViewModel.init`).
+- [x] Compilar + tests unitarios + lint (0 issues).
+- [x] Instalado y verificado OFFLINE en dispositivo:
+  - archivos pusheados al cap. 2 → reinicio sin red → Biblioteca muestra **"Descargados: 2/652"** sin abrir el webtoon.
+  - al abrir la ficha, el cap. 1 con archivos se marcó "✓ 2 · Leer" automáticamente.
+- [x] Commit/push (`b209741`, auxiliares; este paso commiteado).
 
 ## Archivos afectados
-- `domain/repo/SeriesRepository.kt`
-- `data/repository/SeriesRepositoryImpl.kt`
-- `ui/series/SeriesViewModel.kt` (init: auditoría una vez al abrir, sin bloquear)
+- `domain/repo/SeriesRepository.kt`, `data/repository/SeriesRepositoryImpl.kt`
+- `data/repository/LocalLibraryAuditor.kt` (nuevo)
+- `App.kt` (EntryPoint al arranque), `ui/library/LibraryViewModel.kt`
+- `ui/series/SeriesViewModel.kt`, `data/db/dao/SeriesDao.kt`
 
 ## Notas de diseño
-- Solo actúa sobre capítulos `NONE` (seguro). `FAILED` queda para el motor; `COMPLETED` sin archivos → el lector ofrece "Re-descargar" (ya implementado).
-- La auditoría es local y rápida (listar directorios); no toca red ni espera.
+- Solo actúa sobre capítulos `NONE` (no toca FAILED ni los válidos). `COMPLETED` sin archivos → el lector ofrece "Re-descargar".
+- `reconcileAllAsync()` es idempotente por proceso; corre en `Dispatchers.IO`.
+- Guarda el estado en la fila del capítulo para que Biblioteca/ficha/lector lo reflejen.

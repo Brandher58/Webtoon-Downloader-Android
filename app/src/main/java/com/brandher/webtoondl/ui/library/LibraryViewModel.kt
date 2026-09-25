@@ -32,13 +32,20 @@ data class LibraryUiState(
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    seriesRepository: SeriesRepository,
+    private val seriesRepository: SeriesRepository,
     private val downloadRepository: DownloadRepository,
     private val exportRepository: ExportRepository,
 ) : ViewModel() {
 
     private val _exporting = MutableStateFlow<String?>(null)
     private val _message = MutableStateFlow<String?>(null)
+
+    init {
+        // Detecta (sin red) capítulos ya descargados en disco al abrir la Biblioteca.
+        viewModelScope.launch {
+            runCatching { seriesRepository.reconcileAllDownloads() }
+        }
+    }
 
     val exporting: StateFlow<String?> = _exporting.asStateFlow()
     val message: StateFlow<String?> = _message.asStateFlow()

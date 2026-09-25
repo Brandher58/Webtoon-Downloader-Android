@@ -42,6 +42,20 @@ class StorageManager @Inject constructor(
         return File(seriesDir(entity.seriesId), name)
     }
 
+    /** Lista (número de capítulo, nº de archivos no vacíos) presente en disco para una serie. */
+    fun chapterNumbersInSeries(seriesId: String): List<Pair<Int, Int>> {
+        val dir = seriesDir(seriesId)
+        if (!dir.isDirectory) return emptyList()
+        val chapter = Regex("""Chapter (\d+)""")
+        return dir.listFiles { f -> f.isDirectory }?.mapNotNull { d ->
+                val m = chapter.matchEntire(d.name) ?: return@mapNotNull null
+                val number = m.groupValues[1].toIntOrNull() ?: return@mapNotNull null
+                val files = d.listFiles { f -> f.isFile && f.length() > 0L }?.size ?: 0
+                if (files == 0) null else number to files
+            }?.sortedBy { it.first }
+            ?: emptyList()
+    }
+
     fun chapterFiles(entity: ChapterEntity): List<File> =
         chapterFiles(entity.seriesId, entity.number)
 

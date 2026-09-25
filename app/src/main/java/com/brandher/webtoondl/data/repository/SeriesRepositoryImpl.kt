@@ -123,6 +123,7 @@ class SeriesRepositoryImpl @Inject constructor(
     /** Audita el disco (sin red): los capítulos marcados NONE que ya tienen archivos pasan a COMPLETED. */
     override suspend fun reconcileDownloads(seriesId: String) {
         chapterDao.getForSeries(seriesId).forEach { reconcileChapter(it) }
+        reconstructFromDisk(seriesId)
     }
 
     override suspend fun reconcileAllDownloads(): Int {
@@ -131,8 +132,43 @@ class SeriesRepositoryImpl @Inject constructor(
             chapterDao.getForSeries(series.id).forEach { chapter ->
                 if (reconcileChapter(chapter)) changed++
             }
+            changed += reconstructFromDisk(series.id)
         }
         return changed
+    }
+
+    /**
+     * Recupera capítulos cuyos archivos existen en disco pero cuyo registro se perdió
+     * (p. ej. tras reinstalar/limpiar datos): recrea la fila con estado COMPLETED y el id
+     * coherente con la fuente ("{seriesId}:{episodeNo}") para no duplicar al sincronizar online.
+     * @return nº de capítulos reconstruidos.
+     */
+    private suspend fun reconstructFromDisk(seriesId: String): Int {
+        val series = seriesDao.getById(seriesId) ?: return 0
+        val existingIds = chapterDao.getForSeries(seriesId).map { it.id }.toSet()
+        val missing = storage.chapterNumbersInSeries(seriesId).mapNotNull { (number, fileCount) ->
+            val id = "${series.id}:$number"
+            if (id in existingIds) return@mapNotNull null
+            ChapterEntity(
+                id = id,
+                seriesId = series.id,
+                sourceId = series.sourceId,
+                episodeNo = number.toLong(),
+                number = number,
+                title = "Capítulo $number",
+                viewerUrl = "",
+                thumbUrl = null,
+                date = null,
+                queueStatus = QueueStatus.COMPLETED.name,
+                pagesTotal = fileCount,
+                pagesDone = fileCount,
+                outputFormat = "IMAGES",
+                error = null,
+            )
+        }
+        if (missing.isEmpty()) return 0
+        missing.chunked(SqlBatch.SIZE).forEach { chapterDao.upsertAll(it) }
+        return missing.size
     }
 
     /** @return true si el capítulo cambió de NONE a COMPLETED porque ya tenía archivos. */

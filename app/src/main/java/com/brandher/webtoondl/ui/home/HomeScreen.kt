@@ -27,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +63,8 @@ fun HomeScreen(
     val discovery by viewModel.discovery.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val addUrlState by viewModel.addUrlState.collectAsStateWithLifecycle()
+    val sources by viewModel.sources.collectAsStateWithLifecycle()
+    val selectedSource by viewModel.selectedSource.collectAsStateWithLifecycle()
     var url by rememberSaveable { mutableStateOf("") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -162,11 +165,23 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        sources.forEach { source ->
+                            FilterChip(
+                                selected = source.id == selectedSource,
+                                onClick = { viewModel.selectSource(source.id) },
+                                label = { Text(source.displayName) },
+                            )
+                        }
+                    }
+                }
+
+                item {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Buscar webtoons por nombre…") },
+                        placeholder = { Text("Buscar por nombre…") },
                         trailingIcon = {
                             IconButton(onClick = { viewModel.search(searchQuery) }) {
                                 Icon(Icons.Filled.Search, contentDescription = "Buscar")

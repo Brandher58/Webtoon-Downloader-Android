@@ -76,7 +76,7 @@ class LibraryExporter @Inject constructor(
                     continue
                 }
                 val pages = runCatching { source.fetchPages(chapter.toDomain()) }.getOrNull().orEmpty()
-                val web = downloadToCache(chapter, pages)
+                val web = downloadToCache(chapter, pages, source.imageReferer)
                 if (web.isNotEmpty()) {
                     rows += chapter to web
                     fromWeb++
@@ -111,7 +111,7 @@ class LibraryExporter @Inject constructor(
             .orEmpty()
     }
 
-    private fun downloadToCache(chapter: ChapterEntity, pages: List<PageRef>): List<File> {
+    private fun downloadToCache(chapter: ChapterEntity, pages: List<PageRef>, referer: String): List<File> {
         val dir = File(context.cacheDir, "export-src-${chapter.id}")
         if (dir.exists()) dir.deleteRecursively()
         dir.mkdirs()
@@ -120,7 +120,7 @@ class LibraryExporter @Inject constructor(
             val ext = extensionOf(page.url)
             val target = File(dir, "${page.pageNo.toString().padStart(4, '0')}.$ext")
             runCatching {
-                PageFileDownloader.download(client, page.url, target, "$WEBTOONS_HOST/", DESKTOP_UA)
+                PageFileDownloader.download(client, page.url, target, referer, DESKTOP_UA)
             }
             if (target.isFile && target.length() > 0L) files += target
         }

@@ -50,6 +50,8 @@ class WebtoonSource @Inject constructor(
     override val id = "webtoon"
     override val displayName = "Webtoon"
 
+    override val imageReferer: String get() = "$WEBTOONS_HOST/"
+
     override fun canHandle(url: String): Boolean {
         val host = url.toHttpUrlOrNull()?.host?.lowercase() ?: return false
         return host == "webtoons.com" || host.endsWith(".webtoons.com")

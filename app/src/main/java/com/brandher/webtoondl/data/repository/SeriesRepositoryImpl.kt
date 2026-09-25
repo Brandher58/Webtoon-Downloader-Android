@@ -21,6 +21,7 @@ import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.model.SeriesStats
 import com.brandher.webtoondl.domain.repo.SeriesRepository
+import com.brandher.webtoondl.domain.repo.SourceDescriptor
 import com.brandher.webtoondl.domain.source.NoChaptersFoundException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -257,9 +258,12 @@ class SeriesRepositoryImpl @Inject constructor(
         seriesDao.deleteById(seriesId)
     }
 
-    override suspend fun discoverHome(): List<HomeSection> =
-        sourceRegistry.primary.homeSections()
+    override suspend fun availableSources(): List<SourceDescriptor> =
+        sourceRegistry.sources().map { SourceDescriptor(it.id, it.displayName) }
 
-    override suspend fun search(keyword: String): List<SeriesRef> =
-        sourceRegistry.primary.search(keyword)
+    override suspend fun discoverHome(sourceId: String): List<HomeSection> =
+        sourceRegistry.byId(sourceId)?.homeSections() ?: sourceRegistry.primary.homeSections()
+
+    override suspend fun search(sourceId: String, keyword: String): List<SeriesRef> =
+        sourceRegistry.byId(sourceId)?.search(keyword) ?: sourceRegistry.primary.search(keyword)
 }

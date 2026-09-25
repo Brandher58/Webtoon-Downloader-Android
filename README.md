@@ -14,7 +14,7 @@ Aplicación para Android que te permite **descargar webtoons y manhwas de Webtoo
 
 ## Qué puedes hacer
 
-- 🔎 **Buscar** webtoons por nombre o **agregarlos por URL**.
+- 🔎 **Buscar** webtoons o manhwas por nombre (**Webtoon** y **ManhwaWeb** en el Inicio) o **agregarlos por URL**.
 - 💾 **Descargar** capítulos para leerlos sin internet (uno, un rango o todos).
 - 📚 **Biblioteca** con tu progreso y "Continuar leyendo".
 - 📖 **Lector vertical** con zoom, pantalla completa y memoria de posición.
@@ -63,8 +63,9 @@ Para generar un release firmado consulta `tasks/lessons.md` (keystore, versionad
 
 ### Nota sobre el contenido
 
-La app usa **webtoons.com** (contenido público) y está pensada para **uso personal**. Respeta los
-términos de uso del sitio; la idea es tener tus series favoritas a mano cuando no hay internet.
+La app usa **webtoons.com** (contenido público) y opcionalmente **ManhwaWeb** (biblioteca +18, elige
+con el selector del Inicio). Está pensada para **uso personal**: respeta los términos de uso de cada
+sitio y ten en cuenta que parte del contenido de ManhwaWeb puede ser no licenciado.
 
 ---
 

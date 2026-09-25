@@ -14,6 +14,9 @@ interface Source {
     val id: String
     val displayName: String
 
+    /** Referer que exigen las imágenes de esta fuente al descargarlas. */
+    val imageReferer: String
+
     /** Devuelve true si esta fuente puede procesar la URL dada. */
     fun canHandle(url: String): Boolean
 

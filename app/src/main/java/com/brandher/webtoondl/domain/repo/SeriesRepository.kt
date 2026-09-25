@@ -10,6 +10,12 @@ import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.model.SeriesStats
 import kotlinx.coroutines.flow.Flow
 
+/** Fuente disponible para descubrir/buscar desde la portada. */
+data class SourceDescriptor(
+    val id: String,
+    val displayName: String,
+)
+
 /** Interfaz del repositorio de series/capítulos. */
 interface SeriesRepository {
 
@@ -26,11 +32,14 @@ interface SeriesRepository {
     /** Última posición leída de cada serie (para "Continuar leyendo"). */
     fun observeLastReadAll(): Flow<List<LastReadInfo>>
 
-    /** Secciones de recomendaciones de la fuente principal. */
-    suspend fun discoverHome(): List<HomeSection>
+    /** Fuentes disponibles para la portada (descubrir y buscar). */
+    suspend fun availableSources(): List<SourceDescriptor>
 
-    /** Busca series por nombre en la fuente principal. */
-    suspend fun search(keyword: String): List<SeriesRef>
+    /** Secciones de recomendaciones de una fuente concreta. */
+    suspend fun discoverHome(sourceId: String): List<HomeSection>
+
+    /** Busca series por nombre en una fuente concreta. */
+    suspend fun search(sourceId: String, keyword: String): List<SeriesRef>
 
     fun observeRecentSeries(limit: Int): Flow<List<Series>>
 

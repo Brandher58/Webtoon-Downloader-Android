@@ -8,6 +8,7 @@ import com.brandher.webtoondl.domain.model.HomeSection
 import com.brandher.webtoondl.domain.model.Series
 import com.brandher.webtoondl.domain.model.SeriesRef
 import com.brandher.webtoondl.domain.repo.SeriesRepository
+import com.brandher.webtoondl.domain.repo.SourceDescriptor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -50,6 +51,13 @@ class HomeViewModel @Inject constructor(
     private val _addUrlState = MutableStateFlow<AddUrlState>(AddUrlState.Idle)
     val addUrlState: StateFlow<AddUrlState> = _addUrlState.asStateFlow()
 
+    private val _sources = MutableStateFlow<List<SourceDescriptor>>(emptyList())
+    val sources: StateFlow<List<SourceDescriptor>> = _sources.asStateFlow()
+
+    private val _selectedSource = MutableStateFlow("")
+    val selectedSource: StateFlow<String> = _selectedSource.asStateFlow()
+
+    private var defaultSourceId = ""
     private var lastHomeSections: List<HomeSection> = emptyList()
 
     val uiState: StateFlow<HomeUiState> =
@@ -65,15 +73,26 @@ class HomeViewModel @Inject constructor(
         )
 
     init {
-        refreshHome()
+        viewModelScope.launch {
+            val list = seriesRepository.availableSources()
+            _sources.value = list
+            defaultSourceId = list.firstOrNull()?.id ?: ""
+            _selectedSource.value = defaultSourceId
+            refreshHome()
+        }
+    }
+
+    fun selectSource(sourceId: String) {
+        if (sourceId == _selectedSource.value || sourceId.isEmpty()) return
+        _selectedSource.value = sourceId
+        lastHomeSections = emptyList()
+        _discovery.value = DiscoveryUiState.Loading
+        viewModelScope.launch { fetchAsync() }
     }
 
     fun refreshHome() {
         viewModelScope.launch {
-            // Muestra al instante lo cacheado (memoria o disco) y refresca en segundo plano.
-            if (lastHomeSections.isEmpty()) {
-                lastHomeSections = HomeSectionsCodec.decode(settingsRepository.getHomeSectionsCache())
-            }
+            // Muestra al instante lo cacheado (memoria) y refresca en segundo plano.
             _discovery.value = if (lastHomeSections.isNotEmpty()) {
                 DiscoveryUiState.Home(lastHomeSections)
             } else {
@@ -84,11 +103,15 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchAsync() {
+        val sourceId = _selectedSource.value.ifEmpty { defaultSourceId }
         try {
-            val sections = seriesRepository.discoverHome()
+            val sections = seriesRepository.discoverHome(sourceId)
             if (sections.isNotEmpty()) {
                 lastHomeSections = sections
-                settingsRepository.saveHomeSectionsCache(HomeSectionsCodec.encode(sections))
+                if (sourceId == defaultSourceId) {
+                    // La caché de disco es por defecto (webtoon); las demás fuentes son de memoria.
+                    settingsRepository.saveHomeSectionsCache(HomeSectionsCodec.encode(sections))
+                }
                 _discovery.value = DiscoveryUiState.Home(sections)
             } else if (lastHomeSections.isNotEmpty()) {
                 // Respuesta vacía (transitoria): conserva la caché y no la sobrescribes.
@@ -113,10 +136,11 @@ class HomeViewModel @Inject constructor(
     fun search(query: String) {
         val q = query.trim()
         if (q.isEmpty()) return
+        val sourceId = _selectedSource.value.ifEmpty { defaultSourceId }
         viewModelScope.launch {
             _discovery.value = DiscoveryUiState.Loading
             _discovery.value = try {
-                DiscoveryUiState.SearchResults(q, seriesRepository.search(q))
+                DiscoveryUiState.SearchResults(q, seriesRepository.search(sourceId, q))
             } catch (e: Exception) {
                 DiscoveryUiState.Error(e.message ?: "No se pudo realizar la búsqueda")
             }

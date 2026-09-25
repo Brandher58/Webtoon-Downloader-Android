@@ -37,8 +37,10 @@ class App : Application() {
     }
 
     /**
-     * El CDN de Webtoon (webtoon-phinf.pstatic.net) exige el header Referer;
-     * sin él devuelve 403. Registramos ese cliente para todas las imágenes de Coil.
+     * Los CDN exigen el header Referer según la fuente de la imagen:
+     * - Webtoon (webtoon-phinf.pstatic.net): referer www.webtoons.com
+     * - ManhwaWeb (img1mw.xyz / img2mw.xyz): referer manhwaweb.com
+     * Sin él devuelven 403. Registramos el cliente con el header correcto para todas las imágenes de Coil.
      */
     private fun setupCoil() {
         val client = OkHttpClient.Builder()
@@ -49,10 +51,15 @@ class App : Application() {
                 val host = request.url.host.lowercase()
                 val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                if (host == "webtoon-phinf.pstatic.net" || host == "www.webtoons.com") {
+                val referer = when (host) {
+                    "webtoon-phinf.pstatic.net", "www.webtoons.com" -> "https://www.webtoons.com/"
+                    "img1mw.xyz", "img2mw.xyz" -> "https://manhwaweb.com/"
+                    else -> null
+                }
+                if (referer != null) {
                     chain.proceed(
                         request.newBuilder()
-                            .header("Referer", "https://www.webtoons.com/")
+                            .header("Referer", referer)
                             .header("User-Agent", userAgent)
                             .build(),
                     )

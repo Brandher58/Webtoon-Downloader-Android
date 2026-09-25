@@ -271,7 +271,7 @@ class DownloadManager @Inject constructor(
                     async {
                         semaphore.withPermit {
                             currentCoroutineContext().ensureActive()
-                            downloadPage(entity, page)
+                            downloadPage(entity, page, source.imageReferer)
                         }
                     }
                 }.awaitAll()
@@ -297,7 +297,11 @@ class DownloadManager @Inject constructor(
         }
     }
 
-    private suspend fun downloadPage(chapter: ChapterEntity, page: com.brandher.webtoondl.data.db.PageEntity): Boolean {
+    private suspend fun downloadPage(
+        chapter: ChapterEntity,
+        page: com.brandher.webtoondl.data.db.PageEntity,
+        referer: String,
+    ): Boolean {
         val target = storage.pageFile(chapter, page.fileName)
         if (target.exists() && target.length() > 0L) {
             pageDao.updateStatus(page.id, PageStatus.COMPLETED.name)
@@ -310,7 +314,7 @@ class DownloadManager @Inject constructor(
             currentCoroutineContext().ensureActive()
             try {
                 val ok = withContext(Dispatchers.IO) {
-                    PageFileDownloader.download(client, page.url, target, "$WEBTOONS_HOST/", DESKTOP_UA)
+                    PageFileDownloader.download(client, page.url, target, referer, DESKTOP_UA)
                 }
                 if (ok) {
                     pageDao.updateStatus(page.id, PageStatus.COMPLETED.name)

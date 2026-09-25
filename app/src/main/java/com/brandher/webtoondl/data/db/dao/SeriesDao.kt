@@ -22,6 +22,9 @@ interface SeriesDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(series: SeriesEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsentAll(series: List<SeriesEntity>)
+
     /** Actualiza solo metadatos de la serie, sin tocar la fila ni sus hijos. */
     @Query(
         """UPDATE series SET url = :url, title = :title, cover_url = :coverUrl,

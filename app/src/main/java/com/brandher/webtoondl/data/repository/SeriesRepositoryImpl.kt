@@ -100,9 +100,11 @@ class SeriesRepositoryImpl @Inject constructor(
     override suspend fun syncChapters(seriesId: String): Int {
         val series = seriesDao.getById(seriesId)?.toDomain() ?: return 0
         val source = sourceRegistry.match(series.url)
+        // Refresca metadatos (título, portada…) cuando hay red, p. ej. series descubiertas del disco.
+        val fresh = runCatching { source.fetchSeries(series.url) }.getOrNull() ?: series
+        persistSeries(fresh.toEntity())
         val chapters = source.fetchChapters(series)
         if (chapters.isEmpty()) return 0
-        persistSeries(series.toEntity())
         persistChapters(chapters.map { it.toEntity() })
         return chapters.size
     }
@@ -127,7 +129,7 @@ class SeriesRepositoryImpl @Inject constructor(
     }
 
     override suspend fun reconcileAllDownloads(): Int {
-        var changed = 0
+        var changed = discoverMissingSeriesFromDisk()
         seriesDao.getAll().forEach { series ->
             chapterDao.getForSeries(series.id).forEach { chapter ->
                 if (reconcileChapter(chapter)) changed++
@@ -135,6 +137,36 @@ class SeriesRepositoryImpl @Inject constructor(
             changed += reconstructFromDisk(series.id)
         }
         return changed
+    }
+
+    /**
+     * El disco manda: si hay una carpeta de serie descargada ("webtoon_<titleNo>") sin registro en
+     * la BD (p. ej. tras reinstalar), crea la serie con datos locales; el título/portada reales se
+     * refrescan la primera vez que se abre online.
+     * @return nº de series creadas.
+     */
+    private suspend fun discoverMissingSeriesFromDisk(): Int {
+        val existing = seriesDao.getAll().map { it.id }.toSet()
+        val missing = storage.webtoonTitleNosOnDisk().mapNotNull { titleNo ->
+            val id = "webtoon:$titleNo"
+            if (id in existing) return@mapNotNull null
+            // Solo interesan carpetas con al menos un capítulo con contenido.
+            if (storage.chapterNumbersInSeries(id).isEmpty()) return@mapNotNull null
+            SeriesEntity(
+                id = id,
+                sourceId = "webtoon",
+                url = "https://www.webtoons.com/list?title_no=$titleNo",
+                title = "Webtoon $titleNo",
+                coverUrl = null,
+                author = null,
+                genre = null,
+                summary = null,
+                addedAt = System.currentTimeMillis(),
+            )
+        }
+        if (missing.isEmpty()) return 0
+        missing.chunked(SqlBatch.SIZE).forEach { seriesDao.insertIfAbsentAll(it) }
+        return missing.size
     }
 
     /**

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.brandher.webtoondl.data.db.AppDatabase
 import com.brandher.webtoondl.data.db.MIGRATION_1_2
+import com.brandher.webtoondl.data.db.MIGRATION_2_3
 import com.brandher.webtoondl.data.db.dao.ChapterDao
 import com.brandher.webtoondl.data.db.dao.PageDao
 import com.brandher.webtoondl.data.db.dao.ReadingPositionDao
@@ -25,9 +26,7 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "webtoondl.db")
-            .addMigrations(MIGRATION_1_2)
-            // Temporal: se definirán migraciones reales al estabilizar el esquema en las primeras etapas.
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     @Provides

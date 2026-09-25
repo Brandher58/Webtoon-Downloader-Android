@@ -42,6 +42,16 @@ class StorageManager @Inject constructor(
         return File(seriesDir(entity.seriesId), name)
     }
 
+    /** Detecta series descargadas en disco (carpetas "webtoon_<titleNo>") cuyo registro pueda faltar en la BD. */
+    fun webtoonTitleNosOnDisk(): List<Long> {
+        if (!root.isDirectory) return emptyList()
+        val webtoon = Regex("""webtoon_(\d+)""")
+        return root.listFiles { f -> f.isDirectory }?.mapNotNull { d ->
+                webtoon.matchEntire(d.name)?.groupValues?.get(1)?.toLongOrNull()
+            }?.sorted()
+            ?: emptyList()
+    }
+
     /** Lista (número de capítulo, nº de archivos no vacíos) presente en disco para una serie. */
     fun chapterNumbersInSeries(seriesId: String): List<Pair<Int, Int>> {
         val dir = seriesDir(seriesId)

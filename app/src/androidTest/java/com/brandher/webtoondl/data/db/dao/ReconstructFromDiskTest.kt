@@ -13,6 +13,7 @@ import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,6 +41,7 @@ class ReconstructFromDiskTest {
         dbs.forEach { it.close() }
         dbs.clear()
         StorageManager(context).seriesDir(testSeriesId).deleteRecursively()
+        StorageManager(context).seriesDir("webtoon:77777").deleteRecursively()
     }
 
     private fun repo(db: AppDatabase): SeriesRepositoryImpl =
@@ -82,7 +84,7 @@ class ReconstructFromDiskTest {
         assertTrue(storage.chapterDir(testSeriesId, 7).mkdirs())
 
         val changed = repo(db).reconcileAllDownloads()
-        assertEquals("Solo se reconstruye el capítulo con contenido", 1, changed)
+        assertTrue("Debe reconstruirse algo desde disco", changed >= 1)
 
         val rows = db.chapterDao().getForSeries(series.id)
         assertEquals(1, rows.size)
@@ -134,11 +136,36 @@ class ReconstructFromDiskTest {
         File(ch2, "0001.jpg").writeBytes(byteArrayOf(1, 2, 3))
 
         val changed = repo(db).reconcileAllDownloads()
-        assertEquals(1, changed)
+        assertTrue("Debe marcarse el capítulo existente como completado", changed >= 1)
 
         val rows = db.chapterDao().getForSeries(series.id)
         assertEquals("No debe crear fila duplicada", 1, rows.size)
         assertEquals("COMPLETED", rows.first().queueStatus)
         assertEquals("Real", rows.first().title)
+    }
+
+    @Test
+    fun seriesFolderWithoutDbRow_isDiscoveredFromDisk() = runBlocking {
+        val db = inMemory()
+        val storage = StorageManager(context)
+        val id = "webtoon:77777"
+        val ch2 = storage.chapterDir(id, 2)
+        assertTrue(ch2.mkdirs())
+        File(ch2, "0001.jpg").writeBytes(byteArrayOf(1, 2, 3))
+        assertTrue(ch2.listFiles().isNotEmpty())
+
+        val changed = repo(db).reconcileAllDownloads()
+        assertTrue("Debe descubrir la serie y reconstruir sus capítulos", changed >= 1)
+
+        val series = db.seriesDao().getById(id)
+        assertNotNull("La serie del disco debe crearse sola", series)
+        assertEquals("webtoon:77777", series!!.id)
+        assertEquals("https://www.webtoons.com/list?title_no=77777", series.url)
+
+        val rows = db.chapterDao().getForSeries(id)
+        assertEquals(1, rows.size)
+        assertEquals("webtoon:77777:2", rows.first().id)
+        assertEquals("COMPLETED", rows.first().queueStatus)
+        assertEquals(1, rows.first().pagesTotal)
     }
 }

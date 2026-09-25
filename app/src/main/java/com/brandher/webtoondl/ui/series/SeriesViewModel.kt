@@ -75,19 +75,15 @@ class SeriesViewModel @Inject constructor(
             initialValue = SeriesUiState.Loading,
         )
 
-    private var autoRetried = false
-
     init {
         viewModelScope.launch {
             val state = uiState.first { it is SeriesUiState.Loaded }
             if (state is SeriesUiState.Loaded) {
                 // Auditoría disco → Room (sin red): marca como descargados los capítulos que ya tienen archivos.
                 runCatching { seriesRepository.reconcileDownloads(seriesId) }
-                // Auto-reparación: solo si la serie quedó SIN capítulos (fallo transitorio anterior).
-                if (state.items.isEmpty() && !autoRetried) {
-                    autoRetried = true
-                    runCatching { seriesRepository.syncChapters(seriesId) }
-                }
+                // Sincroniza títulos/metadatos y rellena capítulos faltantes cuando hay red.
+                // Fallo (offline) se ignora; el estado local no se pierde.
+                runCatching { seriesRepository.syncChapters(seriesId) }
             }
         }
     }

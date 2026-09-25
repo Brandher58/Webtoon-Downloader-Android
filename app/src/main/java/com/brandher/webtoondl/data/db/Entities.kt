@@ -39,7 +39,7 @@ data class SeriesEntity(
     ],
     indices = [
         Index(value = ["series_id"]),
-        Index(value = ["source_id", "episode_no"], unique = true),
+        Index(value = ["series_id", "source_id", "episode_no"], unique = true),
     ],
 )
 data class ChapterEntity(

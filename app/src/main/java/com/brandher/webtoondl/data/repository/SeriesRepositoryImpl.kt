@@ -10,6 +10,7 @@ import com.brandher.webtoondl.data.db.SqlBatch
 import com.brandher.webtoondl.data.mapper.toDomain
 import com.brandher.webtoondl.data.mapper.toEntity
 import com.brandher.webtoondl.data.source.SourceRegistry
+import com.brandher.webtoondl.data.storage.StorageManager
 import com.brandher.webtoondl.domain.model.Chapter
 import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.HomeSection
@@ -32,6 +33,7 @@ class SeriesRepositoryImpl @Inject constructor(
     private val seriesDao: SeriesDao,
     private val chapterDao: ChapterDao,
     private val readingPositionDao: ReadingPositionDao,
+    private val storage: StorageManager,
 ) : SeriesRepository {
 
     override fun observeSeries(seriesId: String): Flow<Series?> =
@@ -115,6 +117,20 @@ class SeriesRepositoryImpl @Inject constructor(
         persistSeries(series.toEntity())
         persistChapters(chapters.map { it.toEntity() })
         return series.id
+    }
+
+    /** Audita el disco (sin red): los capítulos marcados NONE que ya tienen archivos pasan a COMPLETED. */
+    override suspend fun reconcileDownloads(seriesId: String) {
+        val chapters = chapterDao.getForSeries(seriesId)
+        for (chapter in chapters) {
+            if (QueueStatus.from(chapter.queueStatus) == QueueStatus.NONE) {
+                val files = storage.chapterFiles(chapter)
+                if (files.isNotEmpty()) {
+                    chapterDao.updateStatus(chapter.id, QueueStatus.COMPLETED.name)
+                    chapterDao.updateProgress(chapter.id, files.size, files.size)
+                }
+            }
+        }
     }
 
     /** Escribe la serie sin borrar: inserta si falta y actualiza metadatos. */

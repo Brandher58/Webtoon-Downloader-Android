@@ -39,8 +39,11 @@ interface SeriesRepository {
 
     suspend fun getSeries(seriesId: String): Series?
 
-    /** Vuelve a buscar los capítulos de la serie desde la fuente (conserva estados de descarga). Devuelve el número. */
+    /** Vuelve a buscar los capítulos de la serie desde la fuente. Insertará nuevos y actualizará metadatos. */
     suspend fun syncChapters(seriesId: String): Int
+
+    /** Audita el disco y marca como COMPLETED los capítulos NONE que ya tienen archivos (sin red). */
+    suspend fun reconcileDownloads(seriesId: String)
 
     /** Agrega una serie a partir de su URL, sincronizando la lista de capítulos. Devuelve el id de la serie. */
     suspend fun addByUrl(url: String): String

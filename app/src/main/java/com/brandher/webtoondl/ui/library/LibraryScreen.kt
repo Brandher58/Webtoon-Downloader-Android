@@ -106,11 +106,12 @@ fun LibraryScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = "No hay series todavía",
+                        text = "No hay series con descargas todavía",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Agrega una serie desde Inicio y descarga capítulos para verlos aquí.",
+                        text = "Descarga capítulos de una serie (desde Inicio o su ficha) y aparecerán aquí " +
+                            "para leerlos sin conexión. Las series que solo abriste quedan en Recientes.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -84,13 +84,14 @@ class SeriesRepositoryImpl @Inject constructor(
 
     override fun observeLibrary(): Flow<List<SeriesStats>> =
         seriesDao.observeAllWithStats().map { rows ->
-            rows.map {
-                SeriesStats(
-                    series = it.series.toDomain(),
-                    totalChapters = it.totalChapters,
-                    downloadedChapters = it.downloadedChapters,
-                )
-            }
+            rows.filter { it.downloadedChapters > 0 }
+                .map {
+                    SeriesStats(
+                        series = it.series.toDomain(),
+                        totalChapters = it.totalChapters,
+                        downloadedChapters = it.downloadedChapters,
+                    )
+                }
         }
 
     override suspend fun getSeries(seriesId: String): Series? =

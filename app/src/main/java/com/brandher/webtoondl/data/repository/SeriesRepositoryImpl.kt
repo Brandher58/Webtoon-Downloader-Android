@@ -107,6 +107,8 @@ class SeriesRepositoryImpl @Inject constructor(
         val chapters = source.fetchChapters(series)
         if (chapters.isEmpty()) return 0
         persistChapters(chapters.map { it.toEntity() })
+        // Si un capítulo ya descargado quedó con fila nueva (id distinto), se marca COMPLETED de inmediato.
+        reconcileDownloads(seriesId)
         return chapters.size
     }
 

@@ -100,24 +100,26 @@ class ManhwawebSource @Inject constructor(
     override suspend fun fetchChapters(series: Series): List<Chapter> {
         val key = series.id.substringAfter(':')
         val body = getJson("$BACKEND/manhwa/see/$key")
-        val chapters = body.arr("chapters")
-        val numbers = chapters.mapNotNull { it.jsonObject.int("chapter") }
-        val uniqueNumbers = numbers.size == numbers.toSet().size
-        return chapters.mapIndexedNotNull { index, el ->
+        // Puede haber varias versiones del mismo capítulo: se conserva una por número.
+        val byNumber = LinkedHashMap<Int, JsonObject>()
+        body.arr("chapters").forEach { el ->
             val ch = el.jsonObject
-            val number = ch.int("chapter") ?: return@mapIndexedNotNull null
+            val number = ch.int("chapter") ?: return@forEach
+            if (byNumber[number] == null) byNumber[number] = ch
+        }
+        return byNumber.entries.sortedBy { it.key }.mapNotNull { (number, ch) ->
             val versions = ch.arr("versions")
             val link = versions.firstOrNull()?.jsonObject?.str("link")
                 ?: ch.str("link")
-                ?: return@mapIndexedNotNull null
-            val capId = link.substringAfterLast('/')
-            if (capId.isBlank() || "," in capId) return@mapIndexedNotNull null
-            val episodeNo = if (uniqueNumbers) number.toLong() else (index + 1).toLong()
+                ?: return@mapNotNull null
+            if (link.isBlank() || "," in link) return@mapNotNull null
+            // Id estable por número (coincide con la reconstrucción desde disco): el estado de
+            // descarga se conserva aunque el sitio rote los enlaces de versión del capítulo.
             Chapter(
-                id = "${series.id}:$capId",
+                id = "${series.id}:$number",
                 seriesId = series.id,
                 sourceId = id,
-                episodeNo = episodeNo,
+                episodeNo = number.toLong(),
                 number = number,
                 title = "Capítulo $number",
                 viewerUrl = link,

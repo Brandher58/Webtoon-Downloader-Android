@@ -77,7 +77,7 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             _exporting.value = seriesId
             _message.value = try {
-                exportRepository.exportSeries(seriesId, format, treeUri)
+                exportRepository.exportSeries(seriesId, emptyList(), format, treeUri)
             } catch (e: Exception) {
                 e.message ?: "No se pudo exportar"
             }

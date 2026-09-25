@@ -10,6 +10,10 @@ import javax.inject.Singleton
 class ExportRepositoryImpl @Inject constructor(
     private val exporter: LibraryExporter,
 ) : ExportRepository {
-    override suspend fun exportSeries(seriesId: String, format: OutputFormat, uri: Uri): String =
-        exporter.exportSeries(seriesId, format, uri)
+    override suspend fun exportSeries(
+        seriesId: String,
+        chapterIds: List<String>,
+        format: OutputFormat,
+        uri: Uri,
+    ): String = exporter.exportSeries(seriesId, chapterIds, format, uri)
 }

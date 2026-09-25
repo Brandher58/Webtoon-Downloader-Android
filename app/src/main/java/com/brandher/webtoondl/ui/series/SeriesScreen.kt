@@ -53,6 +53,7 @@ import com.brandher.webtoondl.domain.model.ChapterItem
 import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.QueueStatus
 import com.brandher.webtoondl.domain.model.Series
+import com.brandher.webtoondl.ui.common.FormatPickerContent
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -303,7 +304,8 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
 
             Text("Exportar archivos", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "Copia las imágenes o genera CBZ/PDF a la carpeta que elijas (solo capítulos descargados).",
+                text = "Genera imágenes, CBZ o PDF en la carpeta que elijas. Usa tus capítulos descargados " +
+                    "y descarga directo del web los que falten. Con la selección exportas solo algunos.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -313,12 +315,18 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
                     showExportDialog = true
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.downloadedCount > 0 && !exporting,
+                enabled = state.totalChapters > 0 && !exporting,
             ) {
                 if (exporting) {
                     CircularProgressIndicator(strokeWidth = 2.dp)
                 } else {
-                    Text("Exportar descargados (${state.downloadedCount})")
+                    Text(
+                        if (state.selectedCount > 0) {
+                            "Exportar selección (${state.selectedCount})"
+                        } else {
+                            "Exportar (${state.downloadedCount} descargados)"
+                        },
+                    )
                 }
             }
 
@@ -344,27 +352,10 @@ private fun DownloadPanel(vm: SeriesViewModel, state: SeriesUiState.Loaded) {
             onDismissRequest = { showExportDialog = false },
             title = { Text("Formato de exportación") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutputFormat.entries.forEach { format ->
-                        Row(Modifier.clickable {
-                            pendingFormat = format
-                            showExportDialog = false
-                            exportLauncher.launch(null)
-                        }) {
-                            Text(
-                                when (format) {
-                                    OutputFormat.IMAGES -> "Imágenes (carpetas)"
-                                    OutputFormat.CBZ -> "CBZ (cada capítulo en un archivo)"
-                                    OutputFormat.PDF -> "PDF (cada capítulo en un archivo)"
-                                },
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Después elige dónde guardarlo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                FormatPickerContent { format ->
+                    pendingFormat = format
+                    showExportDialog = false
+                    exportLauncher.launch(null)
                 }
             },
             confirmButton = {},

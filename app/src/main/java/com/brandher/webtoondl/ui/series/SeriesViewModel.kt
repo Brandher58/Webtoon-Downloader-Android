@@ -153,8 +153,10 @@ class SeriesViewModel @Inject constructor(
         if (_exporting.value) return
         viewModelScope.launch {
             _exporting.value = true
+            // Capítulos elegidos con la selección; si no hay, se exportan todos (los faltantes del web).
+            val ids = selected.value.toList()
             _notice.value = try {
-                exportRepository.exportSeries(seriesId, format, treeUri)
+                exportRepository.exportSeries(seriesId, ids, format, treeUri)
             } catch (e: Exception) {
                 e.message ?: "No se pudo exportar"
             }

@@ -47,6 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.brandher.webtoondl.domain.model.OutputFormat
 import com.brandher.webtoondl.domain.model.SeriesStats
+import com.brandher.webtoondl.ui.common.FormatPickerContent
 import kotlinx.coroutines.delay
 
 @Composable
@@ -167,27 +168,10 @@ fun LibraryScreen(
             onDismissRequest = { showExportDialog = false },
             title = { Text("Formato de exportación") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutputFormat.entries.forEach { format ->
-                        Row(Modifier.clickable {
-                            pendingFormat = format
-                            showExportDialog = false
-                            exportLauncher.launch(null)
-                        }) {
-                            Text(
-                                when (format) {
-                                    OutputFormat.IMAGES -> "Imágenes (carpetas)"
-                                    OutputFormat.CBZ -> "CBZ (cada capítulo en un archivo)"
-                                    OutputFormat.PDF -> "PDF (cada capítulo en un archivo)"
-                                },
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Después elige dónde guardarlo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                FormatPickerContent { format ->
+                    pendingFormat = format
+                    showExportDialog = false
+                    exportLauncher.launch(null)
                 }
             },
             confirmButton = {},
